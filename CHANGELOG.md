@@ -39,10 +39,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed server startup crashes due to module loading issues
 
 ### Planned
-- Migration from Mastra to LangGraph for improved agent workflows and state management
-- Comprehensive authentication system for WebSocket connections
-- Enhanced CI/CD pipeline with GitHub Actions
-- API documentation and examples for client integration
+- **LangGraph Migration (v0.2.0)** - Comprehensive migration from Mastra to LangGraph:
+  - Core LangGraph workflow implementation with typed state schema
+  - Enhanced tool execution with parallel processing and streaming results
+  - Robust state persistence with WebSocket reconnection support
+  - Comprehensive tracing and debugging capabilities
+  - Incremental deprecation of Mastra components
+  - Performance optimization for large document sets and complex workflows
+
+- **Authentication System (v0.3.0)**:
+  - Token-based authentication for WebSocket connections
+  - Role-based access control with fine-grained permissions
+  - Secure token exchange and revocation mechanisms
+  - Integration with Sanity Studio authentication
+
+- **Enhanced Document Management (v0.4.0)**:
+  - Natural language document selection and filtering
+  - Document relationship visualization and navigation
+  - Document change detection and notifications
+  - Multi-document reasoning and context sharing
+
+- **Developer Experience Improvements (v0.5.0)**:
+  - Comprehensive API documentation with OpenAPI specification
+  - Enhanced CI/CD pipeline with automated testing and releases
+  - Performance benchmarking and monitoring tools
+  - Client libraries and integration examples
 
 ## [0.1.0] - 2024-03-08
 
