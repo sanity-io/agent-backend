@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured environment variable loading for better modularity
 - Session preservation for WebSocket connections with reconnection support
 - Heartbeat mechanism to detect and clean up dead connections
+- Structured logging system with configurable log levels
+- Robust error handling utilities with recovery mechanisms
+- Connection recovery with exponential backoff
 
 ### Changed
 - Updated package.json for standalone operation
@@ -22,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved environment variable handling
 - Refactored index.ts for better ESM compatibility
 - Enhanced state management to include session information
+- Replaced console logging with structured logger
+- Improved WebSocket error handling and recovery
 
 ### Fixed
 - ESM/CommonJS compatibility issues with pkce-challenge package
@@ -29,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reconnection logic in client connections
 - Improved error handling when ports are already in use
 - Addressed client disconnection issues with session persistence
+- Enhanced error reporting for debugging
 
 ## [0.1.0] - 2024-03-08
 

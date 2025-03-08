@@ -64,7 +64,7 @@
          - Add experimental-specifier-resolution for Node.js
          - Improve environment loading function
 
-2. [ ] **Improve WebSocket connection stability**  (In progress)
+2. [✅] **Improve WebSocket connection stability**
 
     - Enhance reconnection logic
     - Add better error handling and logging
@@ -78,7 +78,7 @@
     2. [✅] **Enhance client reconnection handling**
          - Implement state preservation between reconnections
          - Add heartbeat mechanism to detect disconnections
-    3. [ ] **Improve error handling and logging**
+    3. [✅] **Improve error handling and logging**
          - Add structured logging for connection events
          - Implement graceful recovery from connection errors
 
