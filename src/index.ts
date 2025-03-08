@@ -18,12 +18,13 @@ import {
   ConnectionError 
 } from "./utils/errorHandler.js"
 
-// LangGraph imports
-import { LangChainMCP } from "./mcp/LangChainMCP.js"
-import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js"
+// Print startup info for debugging
+console.log("Starting server with Node.js version:", process.version);
+console.log("Current working directory:", process.cwd());
 
-// WebSocket server
-import { LangGraphWebSocketServer } from "./server/langGraphWebSocketServer.js"
+// Use the SimpleMCPClient for a proper ESM implementation
+import { SimpleMCPClient } from "./mcp/SimpleMCPClient.js";
+import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js";
 
 // Create logger
 const logger = createLogger('Server', {
@@ -71,9 +72,14 @@ const loadEnvironmentVariables = () => {
 loadEnvironmentVariables()
 
 // Server configuration
-const HTTP_PORT = parseInt(process.env.PORT || "3001")
-const WS_PORT = parseInt(process.env.WEBSOCKET_PORT || "3002")
+const HTTP_PORT = parseInt(process.env.PORT || "3005") // Use 3005 as default for HTTP
+const WS_PORT = parseInt(process.env.WEBSOCKET_PORT || "3002") // Keep WebSocket on 3002
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+
+console.log("Environment variables loaded:");
+console.log("- HTTP_PORT:", HTTP_PORT);
+console.log("- WS_PORT:", WS_PORT);
+console.log("- ANTHROPIC_API_KEY:", ANTHROPIC_API_KEY ? "Set" : "Not set");
 
 if (!ANTHROPIC_API_KEY) {
   logger.error("ANTHROPIC_API_KEY environment variable is required")
@@ -93,6 +99,7 @@ const getAllowedOrigins = () => {
 
 // Set up global error handlers
 process.on('uncaughtException', (error) => {
+  console.error('UNCAUGHT EXCEPTION:', error);
   try {
     logger.fatal('Uncaught exception in server', { 
       error: normalizeError(error)
@@ -106,6 +113,7 @@ process.on('uncaughtException', (error) => {
 })
 
 process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
   try {
     const errorInfo = reason instanceof Error 
       ? { message: reason.message, stack: reason.stack, name: reason.name }
@@ -155,39 +163,22 @@ const startExpressServer = (app: express.Application, port: number, maxRetries =
 }
 
 /**
- * Start a WebSocket server with port fallback
- * @param {number} port - The port to attempt to use
+ * Start a WebSocket server on a specific port
+ * @param {number} port - The port to use (no fallback)
  * @param {SanityAgentAdapter} agent - The agent to use
- * @param {number} maxRetries - Maximum number of alternative ports to try
- * @returns {Promise<{server: LangGraphWebSocketServer, port: number}>}
+ * @returns {Promise<{server: any, port: number}>}
  */
-const startWebSocketServer = async (port: number, agent: SanityAgentAdapter, maxRetries = 5): Promise<{server: LangGraphWebSocketServer, port: number}> => {
-  let currentPort = port
-  let retriesLeft = maxRetries
-  
-  while (retriesLeft >= 0) {
-    try {
-      const websocketServer = new LangGraphWebSocketServer(currentPort, agent)
-      logger.info(`WebSocket server started on port ${currentPort}`)
-      return { server: websocketServer, port: currentPort }
-    } catch (error: any) {
-      if (error.code === 'EADDRINUSE' && retriesLeft > 0) {
-        logger.warn(`WebSocket port ${currentPort} is already in use.`)
-        currentPort++
-        logger.info(`Trying WebSocket port ${currentPort}...`)
-        retriesLeft--
-      } else {
-        if (retriesLeft <= 0) {
-          throw new Error(`Failed to find an available WebSocket port after ${maxRetries} attempts.`)
-        } else {
-          throw error
-        }
-      }
-    }
+const startWebSocketServer = async (port: number, agent: any): Promise<{server: any, port: number}> => {
+  try {
+    // Dynamic import to avoid issues
+    const { LangGraphWebSocketServer } = await import("./server/langGraphWebSocketServer.js");
+    const websocketServer = new LangGraphWebSocketServer(port, agent);
+    logger.info(`WebSocket server started on port ${port}`);
+    return { server: websocketServer, port };
+  } catch (error: any) {
+    console.error('Error starting WebSocket server:', error);
+    throw error;
   }
-  
-  // This should never be reached due to the while loop and error throwing
-  throw new Error("Failed to start WebSocket server")
 }
 
 /**
@@ -195,10 +186,12 @@ const startWebSocketServer = async (port: number, agent: SanityAgentAdapter, max
  */
 async function startServer() {
   try {
+    console.log("=== Starting Sanity MCP Agent server ===");
     logger.info('Starting Sanity MCP Agent server...')
     
-    // Get MCP server path from environment or use the default in LangChainMCP
+    // Get MCP server path from environment or use the default in SimpleMCPClient
     const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH;
+    console.log("MCP server path:", mcpServerPath || "Using default path");
     
     logger.info("=====================================")
     logger.info("Starting Sanity MCP Agent server")
@@ -211,111 +204,142 @@ async function startServer() {
     }
     logger.info("=====================================")
     
-    // Initialize the MCP client using langchain-mcp-adapters
-    const langchainMCP = new LangChainMCP({
-      serverPath: mcpServerPath,
-    })
+    try {
+      // Initialize the MCP client using our simple implementation
+      console.log("Creating SimpleMCPClient instance...");
+      const simpleMCPClient = new SimpleMCPClient({
+        serverPath: mcpServerPath,
+      });
+      console.log("SimpleMCPClient instance created");
 
-    // Connect to the MCP server
-    logger.info("Connecting to Sanity MCP server...")
-    await langchainMCP.connect()
-    
-    // Enhanced logging after connection
-    logger.info("=====================================")
-    logger.info("✅ Connected to Sanity MCP server successfully!")
-    logger.info("=====================================")
-    logger.debug(`Available tools: ${langchainMCP.getTools().length}`);
-    langchainMCP.getTools().forEach(tool => {
-      logger.debug(`  - ${tool.name}: ${tool.description}`);
-    });
-    logger.info("=====================================")
-    
-    // Create a LangGraph agent adapter
-    const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY!, langchainMCP);
-    
-    // Initialize the agent
-    await agent.initialize();
-    
-    // Log agent initialization
-    logger.info("=====================================")
-    logger.info("✅ Sanity LangGraph agent initialized")
-    logger.info("=====================================")
-    logger.info(`Agent model: Claude 3.7 Sonnet`)
-    logger.info(`Agent tools: ${agent.getTools().length} tools available`)
-    logger.info("=====================================")
-    
-    // Create Express server for REST API
-    const app = express()
-
-    // Configure CORS
-    app.use(
-      cors({
-        origin: getAllowedOrigins(),
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-      })
-    )
-
-    // Route for health check
-    app.get("/health", (req, res) => {
-      res.json({ status: "healthy", message: "Sanity MCP agent server is running" })
-    })
-
-    // Process messages from the REST API endpoint
-    app.post("/api/chat", express.json(), async (req, res) => {
-      try {
-        const { content } = req.body
-
-        if (!content) {
-          return res.status(400).json({ error: "Message content is required" })
-        }
-
-        // Process the message through the agent
-        const response = await agent.generate(content)
-
-        // Return the agent's response
-        res.json({
-          message: response,
-        })
-      } catch (error) {
-        logger.error("Error processing message:", {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        res.status(500).json({
-          error: "Failed to process message",
-          details: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    })
-
-    // Start the Express server with port fallback
-    const actualHttpPort = await startExpressServer(app, HTTP_PORT)
-    
-    // Start the WebSocket server with the LangGraph agent and port fallback
-    const { server: websocketServer, port: actualWsPort } = await startWebSocketServer(WS_PORT, agent)
-    
-    // Log the actual ports being used
-    logger.info(`Server is running on:`);
-    logger.info(`- HTTP API: http://localhost:${actualHttpPort}`);
-    logger.info(`- WebSocket: ws://localhost:${actualWsPort}`);
-
-    // Handle graceful shutdown
-    process.on("SIGINT", async () => {
-      logger.info("Shutting down gracefully...")
+      // Connect to the MCP server
+      logger.info("Connecting to Sanity MCP server...")
+      console.log("Connecting to MCP server...");
+      await simpleMCPClient.connect();
+      console.log("Connected to MCP server successfully");
       
-      // Disconnect MCP client
-      try {
-        await langchainMCP.disconnect()
-        logger.info("MCP client disconnected")
-      } catch (err) {
-        logger.error("Error disconnecting MCP client:", {
-          error: err instanceof Error ? err.message : String(err)
-        });
-      }
+      // Enhanced logging after connection
+      logger.info("=====================================")
+      logger.info("✅ Connected to Sanity MCP server successfully!")
+      logger.info("=====================================")
       
-      process.exit(0)
-    })
+      console.log("Getting tools...");
+      const tools = simpleMCPClient.getTools();
+      console.log(`Got ${tools.length} tools from MCP server`);
+      
+      logger.debug(`Available tools: ${tools.length}`);
+      tools.forEach((tool) => {
+        logger.debug(`  - ${tool.name}: ${tool.description || 'No description'}`);
+      });
+      logger.info("=====================================")
+      
+      // Create a LangGraph agent adapter
+      console.log("Creating SanityAgentAdapter instance...");
+      const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY!, simpleMCPClient);
+      console.log("SanityAgentAdapter instance created");
+      
+      // Initialize the agent
+      console.log("Initializing agent...");
+      await agent.initialize();
+      console.log("Agent initialized successfully");
+      
+      // Log agent initialization
+      logger.info("=====================================")
+      logger.info("✅ Sanity LangGraph agent initialized")
+      logger.info("=====================================")
+      logger.info(`Agent model: Claude 3.7 Sonnet`)
+      logger.info(`Agent tools: ${agent.getTools().length} tools available`)
+      logger.info("=====================================")
+      
+      // Start the WebSocket server on the fixed WS_PORT with no fallback
+      console.log("Starting WebSocket server...");
+      try {
+        const { server: websocketServer, port: actualWsPort } = await startWebSocketServer(WS_PORT, agent);
+        console.log(`WebSocket server running on port ${actualWsPort}`);
+      
+        // Create Express server for REST API
+        console.log("Creating Express server...");
+        const app = express();
+
+        // Configure CORS
+        app.use(
+          cors({
+            origin: getAllowedOrigins(),
+            methods: ["GET", "POST", "OPTIONS"],
+            allowedHeaders: ["Content-Type", "Authorization"],
+          })
+        );
+
+        // Route for health check
+        app.get("/health", (req, res) => {
+          res.json({ status: "healthy", message: "Sanity MCP agent server is running" });
+        });
+
+        // Process messages from the REST API endpoint
+        app.post("/api/chat", express.json(), async (req, res) => {
+          try {
+            const { content } = req.body;
+
+            if (!content) {
+              return res.status(400).json({ error: "Message content is required" });
+            }
+
+            // Process the message through the agent
+            const response = await agent.generate(content);
+
+            // Return the agent's response
+            res.json({
+              message: response,
+            });
+          } catch (error) {
+            logger.error("Error processing message:", {
+              error: error instanceof Error ? error.message : String(error)
+            });
+            res.status(500).json({
+              error: "Failed to process message",
+              details: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        });
+
+        // Start the Express server on a different port range with fallback
+        console.log("Starting Express server...");
+        const actualHttpPort = await startExpressServer(app, HTTP_PORT);
+        console.log(`Express server running on port ${actualHttpPort}`);
+        
+        // Log the actual ports being used
+        logger.info(`Server is running on:`);
+        logger.info(`- HTTP API: http://localhost:${actualHttpPort}`);
+        logger.info(`- WebSocket: ws://localhost:${actualWsPort}`);
+
+        // Handle graceful shutdown
+        process.on("SIGINT", async () => {
+          logger.info("Shutting down gracefully...");
+          
+          // Disconnect MCP client
+          try {
+            await simpleMCPClient.disconnect();
+            logger.info("MCP client disconnected");
+          } catch (err) {
+            logger.error("Error disconnecting MCP client:", {
+              error: err instanceof Error ? err.message : String(err)
+            });
+          }
+          
+          process.exit(0);
+        });
+      } catch (wsError) {
+        logger.error("Failed to start WebSocket server on the required port. Aborting startup.", {
+          error: wsError instanceof Error ? wsError.message : String(wsError)
+        });
+        throw new Error(`WebSocket server failed to start on port ${WS_PORT}. This port is required for operation.`);
+      }
+    } catch (error) {
+      console.error("Error in server initialization:", error);
+      throw error;
+    }
   } catch (error) {
+    console.error("FATAL ERROR:", error);
     logger.fatal("Failed to start server:", {
       error: error instanceof Error ? {
         message: error.message,
@@ -328,7 +352,9 @@ async function startServer() {
 }
 
 // Start the server
+console.log("Calling startServer()");
 startServer().catch(error => {
+  console.error("FATAL STARTUP ERROR:", error);
   logger.fatal("Fatal error during server startup:", {
     error: error instanceof Error ? {
       message: error.message,

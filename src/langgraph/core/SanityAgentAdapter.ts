@@ -1,13 +1,12 @@
 /**
- * Adapter for migrating to LangChain/LangGraph
- * Simplified implementation using langchain-mcp-adapters
+ * Adapter for the Sanity agent using LangGraph
+ * Simple implementation using our SimpleMCPClient
  */
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
-import { LangChainMCP } from "../../mcp/LangChainMCP.js";
+import { SimpleMCPClient, Tool } from "../../mcp/SimpleMCPClient.js";
 import { SanityAgentState, createInitialState } from "../state/types.js";
 import { createLogger } from "../../utils/logger.js";
-import { Tool } from "@langchain/core/tools";
 
 // Create logger for this module
 const logger = createLogger("SanityAgentAdapter");
@@ -28,7 +27,7 @@ export class SanityAgentAdapter {
    */
   constructor(
     private anthropicApiKey: string,
-    private mcpClient: LangChainMCP
+    private mcpClient: SimpleMCPClient
   ) {
     // Initialize the model
     this.model = new ChatAnthropic({
