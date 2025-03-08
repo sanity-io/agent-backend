@@ -359,7 +359,19 @@ export class MCPWebSocketServer {
         this.preserveSessionState(clientId, client.sessionId)
       }
     } catch (error) {
-      logger.error("Error processing user message:", error)
+      // Create a properly typed context object for logging
+      const errorContext: Record<string, any> = {
+        clientId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : 'UnknownError'
+      };
+      
+      if (error instanceof Error && error.stack) {
+        errorContext.errorStack = error.stack;
+      }
+      
+      logger.error("Error processing user message:", errorContext);
+      
       this.sendToClient(clientId, {
         type: "error",
         payload: { message: "Failed to process your message" },
