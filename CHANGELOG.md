@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured logging system with configurable log levels
 - Robust error handling utilities with recovery mechanisms
 - Connection recovery with exponential backoff
+- Debug startup mode for easier troubleshooting
 
 ### Changed
 - Updated package.json for standalone operation
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling when ports are already in use
 - Addressed client disconnection issues with session persistence
 - Enhanced error reporting for debugging
+- Fixed server startup crashes due to module loading issues
 
 ## [0.1.0] - 2024-03-08
 
