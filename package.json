@@ -20,6 +20,10 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.15",
     "@ai-sdk/openai": "^1.2.1",
+    "@langchain/anthropic": "^0.1.0",
+    "@langchain/core": "^0.2.0",
+    "@langchain/langgraph": "^0.1.0",
+    "langchain": "^0.1.0",
     "@mastra/core": "^0.4.4",
     "@mastra/mcp": "^0.2.6",
     "@sanity/client": "^6.28.3",
@@ -42,7 +46,7 @@
     "typescript": "^5.1.3",
     "vitest": "^1.6.1"
   },
-  "resolutions": { 
-    "pkce-challenge": "npm:@modelcontextprotocol/pkce-challenge@^4.1.0" 
+  "resolutions": {
+    "pkce-challenge": "npm:@modelcontextprotocol/pkce-challenge@^4.1.0"
   }
 }
