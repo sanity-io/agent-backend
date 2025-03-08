@@ -3,6 +3,7 @@ import cors from "cors"
 import * as dotenv from "dotenv"
 import path from "path"
 import { fileURLToPath } from "url"
+import fs from "fs"
 import { Agent } from "@mastra/core/agent"
 import { MastraMCPClient } from "@mastra/mcp"
 import { anthropic } from "@ai-sdk/anthropic"
@@ -25,7 +26,7 @@ if (!process.env.SANITY_PROJECT_ID) {
   ]
   
   for (const envFile of envFiles) {
-    if (require('fs').existsSync(envFile)) {
+    if (fs.existsSync(envFile)) {
       console.log(`Loading environment from ${envFile}`)
       dotenv.config({ path: envFile })
       break

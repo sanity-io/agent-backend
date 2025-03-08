@@ -54,7 +54,7 @@
     - Fix the startServer.js script to handle ESM modules correctly
 
     ### Implementation plan
-    1. [ ] **Add resolution for pkce-challenge in package.json**
+    1. [✅] **Add resolution for pkce-challenge in package.json**
          - Add `"resolutions": { "pkce-challenge": "npm:@modelcontextprotocol/pkce-challenge@^4.1.0" }`
          - Update TypeScript configuration if needed
     2. [ ] **Refactor index.ts to better handle ESM imports**
