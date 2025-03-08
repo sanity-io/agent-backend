@@ -1,14 +1,14 @@
 /**
  * Core LangGraph implementation for Sanity Agent
  */
-import { StateGraph } from "@langchain/langgraph";
+import { StateGraph, StateGraphConfig } from "@langchain/langgraph";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { Anthropic } from "@langchain/anthropic";
+import { ChatAnthropic } from "@langchain/anthropic";
 import { DynamicTool } from "@langchain/core/tools";
 import { RunnableSequence } from "@langchain/core/runnables";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import { MastraMCPClient } from "@mastra/mcp";
-import { SanityAgentState, createInitialState } from "../state/types.js";
+import { HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
+import { SanityMCPClient } from "../../mcp/SanityMCPClient.js";
+import { SanityAgentState, createInitialState, DocumentReference, ToolResult, SessionInfo } from "../state/types.js";
 import { createSanityTools } from "../tools/SanityToolWrapper.js";
 
 /**
@@ -19,10 +19,10 @@ import { createSanityTools } from "../tools/SanityToolWrapper.js";
  */
 export async function createSanityAgentGraph(
   anthropicApiKey: string,
-  mcpClient: MastraMCPClient
+  mcpClient: SanityMCPClient
 ): Promise<StateGraph<SanityAgentState>> {
   // Create the model
-  const model = new Anthropic({
+  const model = new ChatAnthropic({
     apiKey: anthropicApiKey,
     modelName: "claude-3-7-sonnet-20240229",
   });
@@ -66,10 +66,10 @@ export async function createSanityAgentGraph(
   ]);
   
   // Create node for updating state with agent response
-  const saveResponseNode = (state: SanityAgentState, { result }: { result: AIMessage }) => {
+  const saveResponseNode = (state: SanityAgentState, result: { result: AIMessage }) => {
     return {
       ...state,
-      messages: [...state.messages, result],
+      messages: [...state.messages, result.result],
       sessionInfo: {
         ...state.sessionInfo,
         lastActivity: new Date().toISOString(),
@@ -77,8 +77,8 @@ export async function createSanityAgentGraph(
     };
   };
   
-  // Create the graph
-  const workflow = new StateGraph<SanityAgentState>({
+  // Define the state and graph configuration
+  const config: StateGraphConfig<SanityAgentState> = {
     channels: {
       messages: {
         value: (x: SanityAgentState) => x.messages,
@@ -109,7 +109,10 @@ export async function createSanityAgentGraph(
         }),
       },
     },
-  });
+  };
+  
+  // Create the graph
+  const workflow = new StateGraph<SanityAgentState>(config);
   
   // Add the nodes to the graph
   workflow.addNode("userInput", userInputNode);
@@ -117,12 +120,12 @@ export async function createSanityAgentGraph(
   workflow.addNode("saveResponse", saveResponseNode);
   
   // Define the edges
+  workflow.addEdge(["__start__"], "userInput");
   workflow.addEdge("userInput", "agent");
   workflow.addEdge("agent", "saveResponse");
-  workflow.setEntryPoint("userInput");
   
   // Define the exit point
-  workflow.setFinishPoint("saveResponse");
+  workflow.addEdge("saveResponse", ["__end__"]);
   
   // Add conditional branching for tool calls later
   
@@ -138,11 +141,9 @@ export async function createSanityAgentGraph(
  */
 export async function createSanityAgent(
   anthropicApiKey: string,
-  mcpClient: MastraMCPClient
+  mcpClient: SanityMCPClient
 ) {
   const graph = await createSanityAgentGraph(anthropicApiKey, mcpClient);
-  
-  const agent = graph.getMessenger();
   
   return {
     /**
@@ -162,7 +163,7 @@ export async function createSanityAgent(
       initialState.sessionInfo.lastActivity = new Date().toISOString();
       
       // Process the message through the graph
-      const result = await agent.invoke(initialState);
+      const result = await graph.invoke(initialState);
       
       return result;
     }

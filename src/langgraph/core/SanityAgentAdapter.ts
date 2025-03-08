@@ -4,7 +4,7 @@
  */
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
-import { MastraMCPClient } from "@mastra/mcp";
+import { SanityMCPClient } from "../../mcp/SanityMCPClient.js";
 import { createSanityTools } from "../tools/SanityToolWrapper.js";
 import { SanityAgentState, createInitialState } from "../state/types.js";
 import { createLogger } from "../../utils/logger.js";
@@ -29,7 +29,7 @@ export class SanityAgentAdapter {
    */
   constructor(
     private anthropicApiKey: string,
-    private mcpClient: MastraMCPClient
+    private mcpClient: SanityMCPClient
   ) {
     // Initialize the model
     this.model = new ChatAnthropic({

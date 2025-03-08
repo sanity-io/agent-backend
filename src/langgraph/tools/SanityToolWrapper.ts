@@ -2,7 +2,7 @@
  * Tool wrapper for Sanity MCP tools to work with LangGraph
  */
 import { DynamicTool } from "@langchain/core/tools";
-import { MastraMCPClient } from "@mastra/mcp";
+import { SanityMCPClient } from "../../mcp/SanityMCPClient.js";
 
 /**
  * Create a dynamic tool wrapper for a Sanity MCP tool
@@ -12,7 +12,7 @@ import { MastraMCPClient } from "@mastra/mcp";
  * @returns A DynamicTool that wraps the Sanity tool
  */
 export function createSanityTool(
-  mcpClient: MastraMCPClient,
+  mcpClient: SanityMCPClient,
   toolName: string,
   description?: string
 ): DynamicTool {
@@ -52,7 +52,7 @@ export function createSanityTool(
  * @param mcpClient The MCP client instance
  * @returns An array of dynamic tools for each Sanity tool
  */
-export async function createSanityTools(mcpClient: MastraMCPClient): Promise<DynamicTool[]> {
+export async function createSanityTools(mcpClient: SanityMCPClient): Promise<DynamicTool[]> {
   // Get all available tools from the MCP client
   const tools = await mcpClient.tools();
   

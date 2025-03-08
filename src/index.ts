@@ -19,12 +19,14 @@ import {
 } from "./utils/errorHandler.js"
 
 // AI dependencies
-import { Agent } from "@mastra/core/agent"
-import { MastraMCPClient } from "@mastra/mcp"
 import { anthropic } from "@ai-sdk/anthropic"
 
+// LangGraph imports
+import { SanityMCPClient } from "./mcp/SanityMCPClient.js"
+import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js"
+
 // WebSocket server
-import { MCPWebSocketServer } from "./server/websocketServer.js"
+import { LangGraphWebSocketServer } from "./server/langGraphWebSocketServer.js"
 
 // Create logger
 const logger = createLogger('Server', {
@@ -158,17 +160,17 @@ const startExpressServer = (app: express.Application, port: number, maxRetries =
 /**
  * Start a WebSocket server with port fallback
  * @param {number} port - The port to attempt to use
- * @param {Agent} agent - The agent to use
+ * @param {SanityAgentAdapter} agent - The agent to use
  * @param {number} maxRetries - Maximum number of alternative ports to try
- * @returns {Promise<{server: MCPWebSocketServer, port: number}>}
+ * @returns {Promise<{server: LangGraphWebSocketServer, port: number}>}
  */
-const startWebSocketServer = async (port: number, agent: Agent, maxRetries = 5): Promise<{server: MCPWebSocketServer, port: number}> => {
+const startWebSocketServer = async (port: number, agent: SanityAgentAdapter, maxRetries = 5): Promise<{server: LangGraphWebSocketServer, port: number}> => {
   let currentPort = port
   let retriesLeft = maxRetries
   
   while (retriesLeft >= 0) {
     try {
-      const websocketServer = new MCPWebSocketServer(currentPort, agent)
+      const websocketServer = new LangGraphWebSocketServer(currentPort, agent)
       logger.info(`WebSocket server started on port ${currentPort}`)
       return { server: websocketServer, port: currentPort }
     } catch (error: any) {
@@ -198,29 +200,27 @@ async function startServer() {
   try {
     logger.info('Starting Sanity MCP Agent server...')
     
-    // Get node path and MCP server path from environment or use defaults
-    const nodePath = process.execPath
-    const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH || "/Users/even/projects/sanity/ai/mcp/sanity-mcp-server/dist/index.js"
+    // Get MCP server path from environment or use the default in SanityMCPClient
+    const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH;
     
     logger.info("=====================================")
-    logger.info("Starting Sanity MCP Agent server with stdio transport (ESM)")
+    logger.info("Starting Sanity MCP Agent server")
     logger.info("=====================================")
-    logger.info(`Node path: ${nodePath}`)
-    logger.info(`MCP server path: ${mcpServerPath}`)
+    logger.info(`Node path: ${process.execPath}`)
+    if (mcpServerPath) {
+      logger.info(`MCP server path: ${mcpServerPath}`)
+    } else {
+      logger.info("Using default MCP server path")
+    }
     logger.info("=====================================")
     
-    // Initialize the MCP client using stdio transport without auth for local development
-    const sanityMCPClient = new MastraMCPClient({
-      name: "sanity-mcp",
-      server: {
-        command: nodePath,
-        args: [mcpServerPath],
-        // No authentication is needed for local stdio transport
-      },
+    // Initialize the MCP client using our new implementation
+    const sanityMCPClient = new SanityMCPClient({
+      serverPath: mcpServerPath,
     })
 
     // Connect to the MCP server
-    logger.info("Connecting to Sanity MCP server via stdio...")
+    logger.info("Connecting to Sanity MCP server...")
     await sanityMCPClient.connect()
     
     // Get available tools from the MCP server
@@ -247,29 +247,15 @@ async function startServer() {
     }
     logger.info("=====================================")
     
-    // Create a Mastra Agent with access to Sanity tools
-    const agent = new Agent({
-      name: "SanityContentAssistant",
-      instructions: `You are a helpful Content Management Assistant for Sanity.io.
-Your goal is to help content editors manage their content efficiently and accurately.
-
-CORE PRINCIPLES:
-1. FOCUS ON WHAT THE USER IS CURRENTLY LOOKING AT - Always prioritize the user's current document focus
-2. Be concise and helpful in your responses
-3. When suggesting changes to content, explain your reasoning
-4. For bulk operations, always show a plan and ask for confirmation before executing
-5. If you're unsure about something, ask for clarification
-
-You have access to Sanity CMS tools through an MCP server connection.
-Use these tools to help the user manage their Sanity content.`,
-      model: anthropic("claude-3-7-sonnet-latest"),
-      // Provide the MCP tools to the agent
-      tools: sanityTools
-    })
+    // Create a LangGraph agent adapter
+    const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY, sanityMCPClient);
+    
+    // Initialize the agent
+    await agent.initialize();
     
     // Log agent initialization
     logger.info("=====================================")
-    logger.info("✅ SanityContentAssistant agent initialized")
+    logger.info("✅ Sanity LangGraph agent initialized")
     logger.info("=====================================")
     logger.info(`Agent model: Claude 3.7 Sonnet`)
     logger.info(`Agent tools: ${Object.keys(sanityTools).length} tools available`)
@@ -306,7 +292,7 @@ Use these tools to help the user manage their Sanity content.`,
 
         // Return the agent's response
         res.json({
-          message: response.text || response.toString(),
+          message: response,
         })
       } catch (error) {
         logger.error("Error processing message:", {
@@ -322,7 +308,7 @@ Use these tools to help the user manage their Sanity content.`,
     // Start the Express server with port fallback
     const actualHttpPort = await startExpressServer(app, HTTP_PORT)
     
-    // Start the WebSocket server with the Mastra agent and port fallback
+    // Start the WebSocket server with the LangGraph agent and port fallback
     const { server: websocketServer, port: actualWsPort } = await startWebSocketServer(WS_PORT, agent)
     
     // Log the actual ports being used
