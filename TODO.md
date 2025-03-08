@@ -57,7 +57,12 @@
     1. [✅] **Add resolution for pkce-challenge in package.json**
          - Add `"resolutions": { "pkce-challenge": "npm:@modelcontextprotocol/pkce-challenge@^4.1.0" }`
          - Update TypeScript configuration if needed
-    2. [ ] **Refactor index.ts to better handle ESM imports**
+    2. [✅] **Refactor index.ts to better handle ESM imports**
+         - Replace require('fs') with proper ESM import 
+         - Restructure environment loading for better modularity
+    3. [✅] **Enhance startServer.js for better ESM compatibility**
+         - Add experimental-specifier-resolution for Node.js
+         - Improve environment loading function
 
 2. [ ] **Improve WebSocket connection stability**
 

@@ -11,26 +11,34 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from .env file
-const envPaths = [
-  path.resolve(__dirname, '../.env'),
-  path.resolve(__dirname, '../config/environments/.env'),
-  path.resolve(__dirname, '../config/environments/.env.development'),
-];
+/**
+ * Load environment variables from available .env files
+ * Follows ESM patterns for file access
+ */
+const loadEnvironment = () => {
+  const envPaths = [
+    path.resolve(__dirname, '../.env'),
+    path.resolve(__dirname, '../config/environments/.env'),
+    path.resolve(__dirname, '../config/environments/.env.development'),
+  ];
 
-let envLoaded = false;
-for (const envPath of envPaths) {
-  if (fs.existsSync(envPath)) {
-    console.log(`Loading environment from: ${envPath}`);
-    dotenv.config({ path: envPath });
-    envLoaded = true;
-    break;
+  let envLoaded = false;
+  for (const envPath of envPaths) {
+    if (fs.existsSync(envPath)) {
+      console.log(`Loading environment from: ${envPath}`);
+      dotenv.config({ path: envPath });
+      envLoaded = true;
+      break;
+    }
   }
-}
 
-if (!envLoaded) {
-  console.warn('Warning: No .env file found. Using environment variables from system.');
-}
+  if (!envLoaded) {
+    console.warn('Warning: No .env file found. Using environment variables from system.');
+  }
+};
+
+// Load environment
+loadEnvironment();
 
 console.log('Starting Sanity MCP Agent server with ESM support...');
 
@@ -45,7 +53,7 @@ console.log(`Sanity MCP server path: ${sanityMcpServerPath}`);
 // Create environment for ESM compatibility
 const enhancedEnv = {
   ...process.env,
-  NODE_OPTIONS: '--no-warnings --trace-warnings',
+  NODE_OPTIONS: '--no-warnings --trace-warnings --experimental-specifier-resolution=node',
   // Don't override NODE_PATH as it might interfere with the path resolution
 };
 

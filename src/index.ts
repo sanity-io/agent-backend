@@ -14,11 +14,20 @@ import { MCPWebSocketServer } from "./server/websocketServer.js"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, "../.env") })
-
-// If .env not found in root, try looking in config/environments
-if (!process.env.SANITY_PROJECT_ID) {
+/**
+ * Load environment variables from available .env files
+ * Following ESM patterns for file loading
+ */
+const loadEnvironmentVariables = () => {
+  // First try the root .env file
+  const rootEnvPath = path.resolve(__dirname, "../.env")
+  if (fs.existsSync(rootEnvPath)) {
+    console.log(`Loading environment from ${rootEnvPath}`)
+    dotenv.config({ path: rootEnvPath })
+    return
+  }
+  
+  // If not found, try alternatives in config/environments
   const envFiles = [
     path.resolve(__dirname, "../config/environments/.env"),
     path.resolve(__dirname, "../config/environments/.env.development"),
@@ -29,10 +38,15 @@ if (!process.env.SANITY_PROJECT_ID) {
     if (fs.existsSync(envFile)) {
       console.log(`Loading environment from ${envFile}`)
       dotenv.config({ path: envFile })
-      break
+      return
     }
   }
+  
+  console.warn("No .env file found. Using environment variables from system.")
 }
+
+// Load environment variables
+loadEnvironmentVariables()
 
 // Server configuration
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
