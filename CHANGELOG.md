@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced error reporting for debugging
 - Fixed server startup crashes due to module loading issues
 
+### Planned
+- Migration from Mastra to LangGraph for improved agent workflows and state management
+- Comprehensive authentication system for WebSocket connections
+- Enhanced CI/CD pipeline with GitHub Actions
+- API documentation and examples for client integration
+
 ## [0.1.0] - 2024-03-08
 
 ### Initial Release

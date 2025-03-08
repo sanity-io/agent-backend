@@ -82,7 +82,52 @@
          - Add structured logging for connection events
          - Implement graceful recovery from connection errors
 
-3. [ ] **Add comprehensive authentication system**
+3. [ ] **Switch from Mastra to LangGraph**
+
+    - Migrate from Mastra agent framework to LangGraph for more robust agent workflows
+    - Gain benefits from LangGraph's state management, tracing, and debugging capabilities
+    - Improve modularity and maintainability of agent logic
+
+    ### Implementation plan
+    1. [ ] **Research and setup LangGraph integration**
+         - Add LangGraph dependencies to package.json: `@langchain/langgraph` and relevant packages
+         - Create a proof-of-concept implementation with simple Sanity tools
+         - Document LangGraph architecture decisions
+    
+    2. [ ] **Create core LangGraph component structure**
+         - Design state schema to replace Mastra agent state
+         - Define structured input/output interfaces for all nodes
+         - Establish node structure for:
+           - User message parsing and intent detection
+           - Context collection from Sanity documents
+           - Response generation with Anthropic
+           - Tool selection and execution
+    
+    3. [ ] **Implement tool integration architecture**
+         - Create wrapper for existing Sanity MCP tools to work with LangGraph
+         - Build tool selection logic using LangGraph's conditional edges
+         - Implement parallel tool execution for efficiency when appropriate
+         - Add tool execution monitoring and retries for reliability
+    
+    4. [ ] **Develop state persistence and recovery mechanism**
+         - Design state persistence adapters for WebSocket reconnection
+         - Implement checkpoint/resumption of agent workflows
+         - Create state rollback capabilities for error recovery
+         - Add serialization/deserialization of graph state
+    
+    5. [ ] **Create comprehensive tracing and debugging**
+         - Implement LangGraph trace collection for each conversation
+         - Add visualization endpoints for workflow inspection
+         - Create structured logging throughout the graph
+         - Develop error boundary nodes for graceful failure handling
+    
+    6. [ ] **Deprecate Mastra components incrementally**
+         - Identify all Mastra usage in codebase
+         - Create adapter layer to minimize migration impact
+         - Replace Mastra agent with LangGraph workflows incrementally
+         - Update tests to use LangGraph mocking patterns
+
+4. [ ] **Add comprehensive authentication system**
 
     - Implement token-based authentication for WebSocket connections
     - Add environment variable configuration for auth settings
