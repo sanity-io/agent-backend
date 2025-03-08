@@ -1,0 +1,9 @@
+.next
+.sanity
+.turbo
+.vercel
+.vscode
+data
+dist
+pnpm-lock.yaml
+apps/web/design/variables.css 
