@@ -42,16 +42,31 @@ export type MessageType =
   | "document_focus" // User's focus on a specific document/field
   | "thinking_state" // Agent is processing/thinking about something
   | "error" // Error message
+  | "ping" // Heartbeat ping
+  | "pong" // Heartbeat pong
+  | "reconnect" // Client reconnection with session info
 
 export interface WebSocketMessage {
   type: MessageType
   payload: Record<string, any>
   requestId?: string // For correlation if needed
+  sessionId?: string // For reconnection support
 }
 
 interface Client {
   ws: WebSocket
   id: string
+  sessionId?: string
+  lastActive: number
+  isAlive: boolean
+}
+
+// State preservation by session ID (for reconnection)
+interface SessionState {
+  agentState: MCPAgentState
+  lastClientId?: string
+  createdAt: Date
+  lastActive: Date
 }
 
 export class MCPWebSocketServer {
@@ -67,12 +82,22 @@ export class MCPWebSocketServer {
       lastActivity: new Date().toISOString()
     }
   }
+  
+  // Session tracking for reconnection support
+  private sessions: Map<string, SessionState> = new Map()
+  
+  // Heartbeat interval (ms) - 30 seconds
+  private readonly HEARTBEAT_INTERVAL = 30000
+  
+  // Session expiry (ms) - 1 hour
+  private readonly SESSION_EXPIRY = 60 * 60 * 1000
 
   constructor(port: number, agent: Agent) {
     this.agent = agent
     this.server = new WebSocketServer({ port })
 
     this.setupServerHandlers()
+    this.setupHeartbeat()
 
     console.log(`WebSocket server started on port ${port}`)
   }
@@ -96,7 +121,7 @@ export class MCPWebSocketServer {
     // Set up interval to log connection count every 30 seconds
     const connectionStatusInterval = setInterval(logConnectionStatus, 30000);
     
-    // Clean up interval on process exit
+    // Clean up intervals on process exit
     process.on("SIGINT", () => {
       clearInterval(connectionStatusInterval);
     });
@@ -105,8 +130,13 @@ export class MCPWebSocketServer {
       // Generate a unique client ID
       const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-      // Store the client
-      this.clients.set(clientId, { ws, id: clientId })
+      // Store the client with active status
+      this.clients.set(clientId, { 
+        ws, 
+        id: clientId, 
+        lastActive: Date.now(),
+        isAlive: true
+      })
 
       connectionCount++;
       console.log(`Client connected: ${clientId} (Total: ${connectionCount})`)
@@ -118,7 +148,26 @@ export class MCPWebSocketServer {
       ws.on("message", (data: string) => {
         try {
           const parsedMessage = JSON.parse(data) as WebSocketMessage
-          this.handleClientMessage(clientId, parsedMessage)
+          
+          // Update client's last activity time
+          const client = this.clients.get(clientId)
+          if (client) {
+            client.lastActive = Date.now()
+            
+            // If this is a reconnection request with sessionId
+            if (parsedMessage.type === 'reconnect' && parsedMessage.sessionId) {
+              this.handleReconnection(clientId, parsedMessage.sessionId)
+            }
+            // If this is a pong response to our heartbeat
+            else if (parsedMessage.type === 'pong') {
+              client.isAlive = true
+              console.log(`Heartbeat received from client ${clientId}`)
+            }
+            // Regular message handling
+            else {
+              this.handleClientMessage(clientId, parsedMessage)
+            }
+          }
         } catch (err) {
           console.error("Failed to parse message:", err)
           this.sendToClient(clientId, {
@@ -132,6 +181,13 @@ export class MCPWebSocketServer {
       // Handle disconnection
       ws.on("close", () => {
         connectionCount--;
+        const client = this.clients.get(clientId)
+        
+        // Preserve session state if client had a session
+        if (client && client.sessionId) {
+          this.preserveSessionState(clientId, client.sessionId)
+        }
+        
         console.log(`Client disconnected: ${clientId} (Remaining: ${connectionCount})`)
         this.clients.delete(clientId)
       })
@@ -177,81 +233,64 @@ export class MCPWebSocketServer {
   }
 
   private async handleUserMessage(clientId: string, content: string, requestId?: string) {
-    try {
-      // Special case for "what am I looking at?" questions
-      const whatAmILookingAtPattern = /what\s+(am\s+i|are\s+we|is\s+this)\s+looking\s+at|what.*document|show.*document|current\s+document/i;
-      
-      if (whatAmILookingAtPattern.test(content)) {
-        // Get current state
-        if (!this.agentState || !this.agentState.userFocus || !this.agentState.userFocus.documentId) {
-          // Send response if no document is focused
-          this.sendToClient(clientId, {
-            type: "agent_message",
-            payload: { 
-              content: "You don't have any document focused at the moment. Please select a document in the Sanity Studio to view its details."
-            },
-            requestId
-          });
-          return;
-        }
-        
-        // Get the focused document
-        const focusedDocId = this.agentState.userFocus.documentId;
-        const focusedDoc = this.agentState.currentSelection.find(doc => doc.id === focusedDocId);
-        
-        if (!focusedDoc) {
-          // Send a message if document isn't in selection
-          this.sendToClient(clientId, {
-            type: "agent_message",
-            payload: { 
-              content: `You were looking at document ID: ${focusedDocId}, but I couldn't retrieve its details. Please try selecting the document again.`
-            },
-            requestId
-          });
-          return;
-        }
-        
-        // Send direct response about the focused document
-        this.sendToClient(clientId, {
-          type: "agent_message",
-          payload: { 
-            content: `You are currently looking at "${focusedDoc.title || focusedDoc.id}" (ID: ${focusedDoc.id}).\nThis is ${focusedDoc.type ? `a ${focusedDoc.type} document` : 'a document'}. To see more details, I can analyze its content for you.`,
-            documentId: focusedDoc.id
-          },
-          requestId
-        });
-        
-        // Mark that we've answered this question
-        this.agentState.userFocus.lastQueryAnswered = 'what_am_i_looking_at';
-        
-        return;
-      }
+    console.log(`Processing user message from ${clientId}`)
 
-      // Process regular message through the agent
-      // Show thinking state
+    // Get client for session management
+    const client = this.clients.get(clientId)
+    
+    // Create a session ID for this client if they don't have one
+    if (client && !client.sessionId) {
+      client.sessionId = `session-${Date.now()}`
+      
+      // Update agent state with session info
+      this.agentState.session = {
+        id: client.sessionId,
+        startedAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+      }
+    }
+    
+    try {
+      // Update agent state
+      this.agentState.session.lastActivity = new Date().toISOString()
+      
+      // Preserve session state
+      if (client?.sessionId) {
+        this.preserveSessionState(clientId, client.sessionId)
+      }
+      
+      // Send "thinking" state to client
       this.sendToClient(clientId, {
         type: "thinking_state",
-        payload: {
-          action: "processing",
-          message: "Processing your message..."
-        }
-      });
-      
-      // Process the user message through the agent
-      const response = await this.agent.generate(content)
-
-      // Send the response back to the client
-      this.sendToClient(clientId, {
-        type: "agent_message",
-        payload: { content: response.text || response.toString() },
+        payload: { state: "processing" },
         requestId
       })
-    } catch (err) {
-      const error = err as Error
+
+      // Process the message with the AI agent - this might take some time
+      const response = await this.agent.generate(content)
+
+      // Extract the response text and format appropriately
+      const responseText = response.text || response.toString()
+
+      // Send the agent's response back to the client
+      this.sendToClient(clientId, {
+        type: "agent_message",
+        payload: { message: responseText },
+        requestId
+      })
+
+      // Update agent state
+      this.agentState.session.lastActivity = new Date().toISOString()
+      
+      // Preserve updated session state after response
+      if (client?.sessionId) {
+        this.preserveSessionState(clientId, client.sessionId)
+      }
+    } catch (error) {
       console.error("Error processing user message:", error)
       this.sendToClient(clientId, {
         type: "error",
-        payload: { message: `Failed to process your message. ${error.message || 'Unknown error'}` },
+        payload: { message: "Failed to process your message" },
         requestId
       })
     }
@@ -334,6 +373,14 @@ export class MCPWebSocketServer {
   }
 
   private sendAgentState(clientId: string) {
+    const client = this.clients.get(clientId)
+    
+    // Include session information with state updates
+    const sessionInfo = client?.sessionId ? {
+      id: client.sessionId,
+      lastActivity: new Date().toISOString()
+    } : this.agentState.session
+
     // Send document set if available
     if (this.agentState.currentSelection.length > 0) {
       this.sendToClient(clientId, {
@@ -345,6 +392,16 @@ export class MCPWebSocketServer {
             type: doc.type,
             lastModified: doc.lastModified
           })),
+          session: sessionInfo
+        },
+      })
+    } else {
+      // Even if no documents, send session info to ensure client has it
+      this.sendToClient(clientId, {
+        type: "document_set_update",
+        payload: {
+          documents: [],
+          session: sessionInfo
         },
       })
     }
@@ -369,8 +426,7 @@ export class MCPWebSocketServer {
 
   // Method to broadcast document set updates to all clients
   public broadcastDocumentSet() {
-    if (this.agentState.currentSelection.length === 0) return;
-    
+    // Always broadcast even if there are no documents, to ensure session info is sent
     this.broadcast({
       type: "document_set_update",
       payload: {
@@ -380,7 +436,149 @@ export class MCPWebSocketServer {
           type: doc.type,
           lastModified: doc.lastModified
         })),
+        session: this.agentState.session
       },
     });
+  }
+
+  /**
+   * Set up heartbeat mechanism to detect dead connections
+   */
+  private setupHeartbeat() {
+    setInterval(() => {
+      this.clients.forEach((client, clientId) => {
+        // Mark client as possibly terminated
+        if (!client.isAlive) {
+          console.log(`Client ${clientId} failed heartbeat check - terminating connection`)
+          client.ws.terminate()
+          this.clients.delete(clientId)
+          return
+        }
+        
+        // Reset alive status to false - client must respond with pong to stay alive
+        client.isAlive = false
+        
+        // Send ping heartbeat
+        try {
+          this.sendToClient(clientId, {
+            type: 'ping',
+            payload: { timestamp: Date.now() }
+          })
+        } catch (error) {
+          console.error(`Failed to send heartbeat to client ${clientId}:`, error)
+        }
+      })
+      
+      // Clean up expired sessions
+      this.cleanupExpiredSessions()
+    }, this.HEARTBEAT_INTERVAL)
+  }
+  
+  /**
+   * Handle client reconnection request
+   * @param clientId - New client ID
+   * @param sessionId - Previous session ID for state recovery
+   */
+  private handleReconnection(clientId: string, sessionId: string) {
+    const session = this.sessions.get(sessionId)
+    const client = this.clients.get(clientId)
+    
+    if (session && client) {
+      console.log(`Client ${clientId} reconnected to session ${sessionId}`)
+      
+      // Restore session state 
+      this.agentState = {...session.agentState}
+      
+      // Update client with session info
+      client.sessionId = sessionId
+      
+      // Update session tracking
+      session.lastActive = new Date()
+      session.lastClientId = clientId
+      
+      // Send restored state to client
+      this.sendAgentState(clientId)
+      
+      // Notify client of successful reconnection
+      this.sendToClient(clientId, {
+        type: 'agent_message',
+        payload: { 
+          message: "Reconnected successfully. Your previous conversation state has been restored.",
+          sessionRestored: true
+        }
+      })
+    } else {
+      console.log(`Client ${clientId} attempted reconnection with invalid session ${sessionId}`)
+      
+      // Generate a new session for this client
+      const newSessionId = `session-${Date.now()}`
+      if (client) {
+        client.sessionId = newSessionId
+      }
+      
+      // Reset agent state for new session
+      this.agentState = {
+        currentSelection: [],
+        userFocus: {},
+        session: {
+          id: newSessionId,
+          startedAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+        },
+      }
+      
+      // Create new session record
+      this.preserveSessionState(clientId, newSessionId)
+      
+      // Send new session info
+      this.sendAgentState(clientId)
+      
+      // Notify client that reconnection failed but new session was created
+      this.sendToClient(clientId, {
+        type: 'agent_message',
+        payload: { 
+          message: "Your previous session could not be found. A new session has been created.",
+          sessionRestored: false,
+          newSessionId: newSessionId
+        }
+      })
+    }
+  }
+  
+  /**
+   * Preserve client state in session storage for future reconnection
+   */
+  private preserveSessionState(clientId: string, sessionId: string) {
+    const client = this.clients.get(clientId)
+    if (!client) return
+    
+    this.sessions.set(sessionId, {
+      agentState: {...this.agentState},
+      lastClientId: clientId,
+      createdAt: new Date(),
+      lastActive: new Date()
+    })
+    
+    console.log(`Session state preserved for client ${clientId} with session ID ${sessionId}`)
+  }
+  
+  /**
+   * Clean up expired sessions to prevent memory leaks
+   */
+  private cleanupExpiredSessions() {
+    const now = Date.now()
+    let expiredCount = 0
+    
+    this.sessions.forEach((session, sessionId) => {
+      const sessionAge = now - session.lastActive.getTime()
+      if (sessionAge > this.SESSION_EXPIRY) {
+        this.sessions.delete(sessionId)
+        expiredCount++
+      }
+    })
+    
+    if (expiredCount > 0) {
+      console.log(`Cleaned up ${expiredCount} expired sessions. Current active sessions: ${this.sessions.size}`)
+    }
   }
 }
