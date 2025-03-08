@@ -1,16 +1,39 @@
+/**
+ * Main entry point for the Sanity MCP Agent server
+ */
+
+// Core imports
 import express from "express"
 import cors from "cors"
 import * as dotenv from "dotenv"
 import path from "path"
 import { fileURLToPath } from "url"
 import fs from "fs"
+
+// Utility imports
+import { createLogger, LogLevel } from "./utils/logger.js"
+import { 
+  normalizeError, 
+  tryCatch, 
+  ConnectionError 
+} from "./utils/errorHandler.js"
+
+// AI dependencies
 import { Agent } from "@mastra/core/agent"
 import { MastraMCPClient } from "@mastra/mcp"
 import { anthropic } from "@ai-sdk/anthropic"
 
+// WebSocket server
 import { MCPWebSocketServer } from "./server/websocketServer.js"
 
-// Get __dirname equivalent in ESM
+// Create logger
+const logger = createLogger('Server', {
+  level: process.env.MASTRA_LOG_LEVEL 
+    ? (process.env.MASTRA_LOG_LEVEL.toLowerCase() === 'debug' ? LogLevel.DEBUG : LogLevel.INFO)
+    : LogLevel.INFO
+})
+
+// Set up __dirname for ESM
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -22,7 +45,7 @@ const loadEnvironmentVariables = () => {
   // First try the root .env file
   const rootEnvPath = path.resolve(__dirname, "../.env")
   if (fs.existsSync(rootEnvPath)) {
-    console.log(`Loading environment from ${rootEnvPath}`)
+    logger.info(`Loading environment from ${rootEnvPath}`)
     dotenv.config({ path: rootEnvPath })
     return
   }
@@ -36,13 +59,13 @@ const loadEnvironmentVariables = () => {
   
   for (const envFile of envFiles) {
     if (fs.existsSync(envFile)) {
-      console.log(`Loading environment from ${envFile}`)
+      logger.info(`Loading environment from ${envFile}`)
       dotenv.config({ path: envFile })
       return
     }
   }
   
-  console.warn("No .env file found. Using environment variables from system.")
+  logger.warn("No .env file found. Using environment variables from system.")
 }
 
 // Load environment variables
@@ -54,7 +77,7 @@ const WS_PORT = parseInt(process.env.WEBSOCKET_PORT || "3002")
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 if (!ANTHROPIC_API_KEY) {
-  console.error("ANTHROPIC_API_KEY environment variable is required")
+  logger.error("ANTHROPIC_API_KEY environment variable is required")
   process.exit(1)
 }
 
@@ -65,8 +88,36 @@ const getAllowedOrigins = () => {
     return origins.split(",").map((origin) => origin.trim())
   }
   // Default to allow all origins in development mode
+  logger.warn("No ALLOWED_ORIGINS specified, defaulting to allow all origins (*)")
   return "*"
 }
+
+// Set up global error handlers
+process.on('uncaughtException', (error) => {
+  try {
+    logger.fatal('Uncaught exception in server', { 
+      error: normalizeError(error)
+    })
+  } catch (logError) {
+    console.error('Error while handling uncaught exception:', logError)
+    console.error('Original error:', error)
+  }
+  // Always exit on uncaught exceptions
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  try {
+    const errorInfo = reason instanceof Error 
+      ? { message: reason.message, stack: reason.stack, name: reason.name }
+      : { message: String(reason) }
+      
+    logger.error('Unhandled promise rejection', { error: errorInfo })
+  } catch (logError) {
+    console.error('Error handling unhandled rejection:', logError)
+    console.error('Original rejection reason:', reason)
+  }
+})
 
 /**
  * Attempt to start a server on a port, with automatic fallback to next port if busy
@@ -80,15 +131,15 @@ const startExpressServer = (app: express.Application, port: number, maxRetries =
     const tryPort = (currentPort: number, retriesLeft: number) => {
       const server = app.listen(currentPort)
         .on('listening', () => {
-          console.log(`Server running at http://localhost:${currentPort}`)
+          logger.info(`Server running at http://localhost:${currentPort}`)
           resolve(currentPort)
         })
         .on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'EADDRINUSE') {
-            console.warn(`Port ${currentPort} is already in use.`)
+            logger.warn(`Port ${currentPort} is already in use.`)
             if (retriesLeft > 0) {
               const nextPort = currentPort + 1
-              console.log(`Trying port ${nextPort}...`)
+              logger.info(`Trying port ${nextPort}...`)
               server.close()
               tryPort(nextPort, retriesLeft - 1)
             } else {
@@ -118,13 +169,13 @@ const startWebSocketServer = async (port: number, agent: Agent, maxRetries = 5):
   while (retriesLeft >= 0) {
     try {
       const websocketServer = new MCPWebSocketServer(currentPort, agent)
-      console.log(`WebSocket server started on port ${currentPort}`)
+      logger.info(`WebSocket server started on port ${currentPort}`)
       return { server: websocketServer, port: currentPort }
     } catch (error: any) {
       if (error.code === 'EADDRINUSE' && retriesLeft > 0) {
-        console.warn(`WebSocket port ${currentPort} is already in use.`)
+        logger.warn(`WebSocket port ${currentPort} is already in use.`)
         currentPort++
-        console.log(`Trying WebSocket port ${currentPort}...`)
+        logger.info(`Trying WebSocket port ${currentPort}...`)
         retriesLeft--
       } else {
         if (retriesLeft <= 0) {
@@ -140,18 +191,23 @@ const startWebSocketServer = async (port: number, agent: Agent, maxRetries = 5):
   throw new Error("Failed to start WebSocket server")
 }
 
+/**
+ * Main server startup function
+ */
 async function startServer() {
   try {
+    logger.info('Starting Sanity MCP Agent server...')
+    
     // Get node path and MCP server path from environment or use defaults
     const nodePath = process.execPath
     const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH || "/Users/even/projects/sanity/ai/mcp/sanity-mcp-server/dist/index.js"
     
-    console.log("=====================================")
-    console.log("Starting Sanity MCP Agent server with stdio transport (ESM)")
-    console.log("=====================================")
-    console.log(`Node path: ${nodePath}`)
-    console.log(`MCP server path: ${mcpServerPath}`)
-    console.log("=====================================")
+    logger.info("=====================================")
+    logger.info("Starting Sanity MCP Agent server with stdio transport (ESM)")
+    logger.info("=====================================")
+    logger.info(`Node path: ${nodePath}`)
+    logger.info(`MCP server path: ${mcpServerPath}`)
+    logger.info("=====================================")
     
     // Initialize the MCP client using stdio transport without auth for local development
     const sanityMCPClient = new MastraMCPClient({
@@ -164,32 +220,32 @@ async function startServer() {
     })
 
     // Connect to the MCP server
-    console.log("Connecting to Sanity MCP server via stdio...")
+    logger.info("Connecting to Sanity MCP server via stdio...")
     await sanityMCPClient.connect()
     
     // Get available tools from the MCP server
     const sanityTools = await sanityMCPClient.tools()
     
     // Enhanced logging after connection
-    console.log("=====================================")
-    console.log("✅ Connected to Sanity MCP server successfully!")
-    console.log("=====================================")
-    console.log(`Available tools (${Object.keys(sanityTools).length}):`);
+    logger.info("=====================================")
+    logger.info("✅ Connected to Sanity MCP server successfully!")
+    logger.info("=====================================")
+    logger.debug(`Available tools (${Object.keys(sanityTools).length}):`);
     Object.keys(sanityTools).forEach(toolName => {
-      console.log(`  - ${toolName}`);
+      logger.debug(`  - ${toolName}`);
     });
-    console.log("=====================================")
+    logger.info("=====================================")
     
     // Check if we have critical tools available
     const criticalTools = ['getDocument', 'listDocuments'];
     const missingTools = criticalTools.filter(tool => !Object.keys(sanityTools).includes(tool));
     
     if (missingTools.length > 0) {
-      console.warn("⚠️ WARNING: Missing critical tools:", missingTools.join(', '));
+      logger.warn(`⚠️ WARNING: Missing critical tools: ${missingTools.join(', ')}`);
     } else {
-      console.log("✅ All critical tools are available");
+      logger.info("✅ All critical tools are available");
     }
-    console.log("=====================================")
+    logger.info("=====================================")
     
     // Create a Mastra Agent with access to Sanity tools
     const agent = new Agent({
@@ -212,12 +268,12 @@ Use these tools to help the user manage their Sanity content.`,
     })
     
     // Log agent initialization
-    console.log("=====================================")
-    console.log("✅ SanityContentAssistant agent initialized")
-    console.log("=====================================")
-    console.log(`Agent model: Claude 3.7 Sonnet`)
-    console.log(`Agent tools: ${Object.keys(sanityTools).length} tools available`)
-    console.log("=====================================")
+    logger.info("=====================================")
+    logger.info("✅ SanityContentAssistant agent initialized")
+    logger.info("=====================================")
+    logger.info(`Agent model: Claude 3.7 Sonnet`)
+    logger.info(`Agent tools: ${Object.keys(sanityTools).length} tools available`)
+    logger.info("=====================================")
     
     // Create Express server for REST API
     const app = express()
@@ -253,11 +309,13 @@ Use these tools to help the user manage their Sanity content.`,
           message: response.text || response.toString(),
         })
       } catch (error) {
-        console.error("Error processing message:", error)
+        logger.error("Error processing message:", {
+          error: error instanceof Error ? error.message : String(error)
+        });
         res.status(500).json({
           error: "Failed to process message",
-          details: (error as Error).message,
-        })
+          details: error instanceof Error ? error.message : "Unknown error",
+        });
       }
     })
 
@@ -268,28 +326,46 @@ Use these tools to help the user manage their Sanity content.`,
     const { server: websocketServer, port: actualWsPort } = await startWebSocketServer(WS_PORT, agent)
     
     // Log the actual ports being used
-    console.log(`Server is running on:`);
-    console.log(`- HTTP API: http://localhost:${actualHttpPort}`);
-    console.log(`- WebSocket: ws://localhost:${actualWsPort}`);
+    logger.info(`Server is running on:`);
+    logger.info(`- HTTP API: http://localhost:${actualHttpPort}`);
+    logger.info(`- WebSocket: ws://localhost:${actualWsPort}`);
 
     // Handle graceful shutdown
     process.on("SIGINT", async () => {
-      console.log("Shutting down gracefully...")
+      logger.info("Shutting down gracefully...")
       
       // Disconnect MCP client
       try {
         await sanityMCPClient.disconnect()
-        console.log("MCP client disconnected")
+        logger.info("MCP client disconnected")
       } catch (err) {
-        console.error("Error disconnecting MCP client:", err)
+        logger.error("Error disconnecting MCP client:", {
+          error: err instanceof Error ? err.message : String(err)
+        });
       }
       
       process.exit(0)
     })
   } catch (error) {
-    console.error("Failed to start server:", error)
-    process.exit(1)
+    logger.fatal("Failed to start server:", {
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : String(error)
+    });
+    process.exit(1);
   }
 }
 
-startServer()
+// Start the server
+startServer().catch(error => {
+  logger.fatal("Fatal error during server startup:", {
+    error: error instanceof Error ? {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    } : String(error)
+  });
+  process.exit(1);
+});
