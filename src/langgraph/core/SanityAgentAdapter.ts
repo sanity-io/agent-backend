@@ -1,24 +1,23 @@
 /**
- * Adapter for migrating from Mastra to LangChain/LangGraph
- * This is a simplified proof-of-concept to get started
+ * Adapter for migrating to LangChain/LangGraph
+ * Simplified implementation using langchain-mcp-adapters
  */
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
-import { SanityMCPClient } from "../../mcp/SanityMCPClient.js";
-import { createSanityTools } from "../tools/SanityToolWrapper.js";
+import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
+import { LangChainMCP } from "../../mcp/LangChainMCP.js";
 import { SanityAgentState, createInitialState } from "../state/types.js";
 import { createLogger } from "../../utils/logger.js";
+import { Tool } from "@langchain/core/tools";
 
 // Create logger for this module
 const logger = createLogger("SanityAgentAdapter");
 
 /**
- * Simple adapter that wraps LangChain components to provide a similar
- * interface as the Mastra agent
+ * Simple adapter that wraps LangChain components
  */
 export class SanityAgentAdapter {
   private model: ChatAnthropic;
-  private tools: any[] = [];
+  private tools: Tool[] = [];
   private systemPrompt: string;
   private state: SanityAgentState;
   
@@ -29,7 +28,7 @@ export class SanityAgentAdapter {
    */
   constructor(
     private anthropicApiKey: string,
-    private mcpClient: SanityMCPClient
+    private mcpClient: LangChainMCP
   ) {
     // Initialize the model
     this.model = new ChatAnthropic({
@@ -62,9 +61,9 @@ export class SanityAgentAdapter {
    */
   async initialize(): Promise<void> {
     try {
-      // Load Sanity tools
+      // Get the tools from the MCP client (they're already loaded)
       logger.info("Loading Sanity tools...");
-      this.tools = await createSanityTools(this.mcpClient);
+      this.tools = this.mcpClient.getTools();
       logger.info(`Loaded ${this.tools.length} Sanity tools`);
       
       // Add system message to conversation history
@@ -133,7 +132,7 @@ export class SanityAgentAdapter {
    * Get available tools
    * @returns The list of available tools
    */
-  getTools(): any[] {
+  getTools(): Tool[] {
     return this.tools;
   }
 } 

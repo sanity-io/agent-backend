@@ -18,11 +18,8 @@ import {
   ConnectionError 
 } from "./utils/errorHandler.js"
 
-// AI dependencies
-import { anthropic } from "@ai-sdk/anthropic"
-
 // LangGraph imports
-import { SanityMCPClient } from "./mcp/SanityMCPClient.js"
+import { LangChainMCP } from "./mcp/LangChainMCP.js"
 import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js"
 
 // WebSocket server
@@ -200,7 +197,7 @@ async function startServer() {
   try {
     logger.info('Starting Sanity MCP Agent server...')
     
-    // Get MCP server path from environment or use the default in SanityMCPClient
+    // Get MCP server path from environment or use the default in LangChainMCP
     const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH;
     
     logger.info("=====================================")
@@ -214,41 +211,27 @@ async function startServer() {
     }
     logger.info("=====================================")
     
-    // Initialize the MCP client using our new implementation
-    const sanityMCPClient = new SanityMCPClient({
+    // Initialize the MCP client using langchain-mcp-adapters
+    const langchainMCP = new LangChainMCP({
       serverPath: mcpServerPath,
     })
 
     // Connect to the MCP server
     logger.info("Connecting to Sanity MCP server...")
-    await sanityMCPClient.connect()
-    
-    // Get available tools from the MCP server
-    const sanityTools = await sanityMCPClient.tools()
+    await langchainMCP.connect()
     
     // Enhanced logging after connection
     logger.info("=====================================")
     logger.info("✅ Connected to Sanity MCP server successfully!")
     logger.info("=====================================")
-    logger.debug(`Available tools (${Object.keys(sanityTools).length}):`);
-    Object.keys(sanityTools).forEach(toolName => {
-      logger.debug(`  - ${toolName}`);
+    logger.debug(`Available tools: ${langchainMCP.getTools().length}`);
+    langchainMCP.getTools().forEach(tool => {
+      logger.debug(`  - ${tool.name}: ${tool.description}`);
     });
     logger.info("=====================================")
     
-    // Check if we have critical tools available
-    const criticalTools = ['getDocument', 'listDocuments'];
-    const missingTools = criticalTools.filter(tool => !Object.keys(sanityTools).includes(tool));
-    
-    if (missingTools.length > 0) {
-      logger.warn(`⚠️ WARNING: Missing critical tools: ${missingTools.join(', ')}`);
-    } else {
-      logger.info("✅ All critical tools are available");
-    }
-    logger.info("=====================================")
-    
     // Create a LangGraph agent adapter
-    const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY, sanityMCPClient);
+    const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY!, langchainMCP);
     
     // Initialize the agent
     await agent.initialize();
@@ -258,7 +241,7 @@ async function startServer() {
     logger.info("✅ Sanity LangGraph agent initialized")
     logger.info("=====================================")
     logger.info(`Agent model: Claude 3.7 Sonnet`)
-    logger.info(`Agent tools: ${Object.keys(sanityTools).length} tools available`)
+    logger.info(`Agent tools: ${agent.getTools().length} tools available`)
     logger.info("=====================================")
     
     // Create Express server for REST API
@@ -322,7 +305,7 @@ async function startServer() {
       
       // Disconnect MCP client
       try {
-        await sanityMCPClient.disconnect()
+        await langchainMCP.disconnect()
         logger.info("MCP client disconnected")
       } catch (err) {
         logger.error("Error disconnecting MCP client:", {
