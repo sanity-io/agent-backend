@@ -47,7 +47,7 @@
       - [ ] Implement coverage enforcement
     - [ ] Monitor and maintain test coverage above 85%
 
-1. [ ] **Fix ESM/CommonJS compatibility issues**  (In progress)
+1. [✅] **Fix ESM/CommonJS compatibility issues**
 
     - Resolve the pkce-challenge package ESM compatibility error
     - Update package.json with proper resolutions for ESM modules
@@ -64,11 +64,23 @@
          - Add experimental-specifier-resolution for Node.js
          - Improve environment loading function
 
-2. [ ] **Improve WebSocket connection stability**
+2. [ ] **Improve WebSocket connection stability**  (In progress)
 
     - Enhance reconnection logic
     - Add better error handling and logging
     - Implement graceful shutdown handling for Kubernetes environments
+
+    ### Implementation plan
+    1. [✅] **Add port fallback mechanism**
+         - Implement automatic port incrementing when ports are in use
+         - Add better error handling and reporting
+         - Ensure proper port notification to help client connections
+    2. [ ] **Enhance client reconnection handling**
+         - Implement state preservation between reconnections
+         - Add heartbeat mechanism to detect disconnections
+    3. [ ] **Improve error handling and logging**
+         - Add structured logging for connection events
+         - Implement graceful recovery from connection errors
 
 3. [ ] **Add comprehensive authentication system**
 

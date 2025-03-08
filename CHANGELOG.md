@@ -11,16 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repository extraction from monorepo structure
 - Initial Dockerization support
 - Kubernetes deployment configuration
+- Automatic port fallback mechanism for HTTP and WebSocket servers
+- Structured environment variable loading for better modularity
 
 ### Changed
 - Updated package.json for standalone operation
 - Enhanced WebSocket server for external deployment
 - Improved environment variable handling
+- Refactored index.ts for better ESM compatibility
 
 ### Fixed
 - ESM/CommonJS compatibility issues with pkce-challenge package
 - WebSocket server path handling
 - Reconnection logic in client connections
+- Improved error handling when ports are already in use
 
 ## [0.1.0] - 2024-03-08
 

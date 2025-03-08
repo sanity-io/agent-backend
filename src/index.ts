@@ -68,6 +68,78 @@ const getAllowedOrigins = () => {
   return "*"
 }
 
+/**
+ * Attempt to start a server on a port, with automatic fallback to next port if busy
+ * @param {Express.Application} app - The Express app
+ * @param {number} port - The port to attempt to use
+ * @param {number} maxRetries - Maximum number of alternative ports to try
+ * @returns {Promise<number>} - The port the server started on
+ */
+const startExpressServer = (app: express.Application, port: number, maxRetries = 5): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const tryPort = (currentPort: number, retriesLeft: number) => {
+      const server = app.listen(currentPort)
+        .on('listening', () => {
+          console.log(`Server running at http://localhost:${currentPort}`)
+          resolve(currentPort)
+        })
+        .on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE') {
+            console.warn(`Port ${currentPort} is already in use.`)
+            if (retriesLeft > 0) {
+              const nextPort = currentPort + 1
+              console.log(`Trying port ${nextPort}...`)
+              server.close()
+              tryPort(nextPort, retriesLeft - 1)
+            } else {
+              reject(new Error(`Failed to find an available port after ${maxRetries} attempts.`))
+            }
+          } else {
+            reject(err)
+          }
+        })
+    }
+    
+    tryPort(port, maxRetries)
+  })
+}
+
+/**
+ * Start a WebSocket server with port fallback
+ * @param {number} port - The port to attempt to use
+ * @param {Agent} agent - The agent to use
+ * @param {number} maxRetries - Maximum number of alternative ports to try
+ * @returns {Promise<{server: MCPWebSocketServer, port: number}>}
+ */
+const startWebSocketServer = async (port: number, agent: Agent, maxRetries = 5): Promise<{server: MCPWebSocketServer, port: number}> => {
+  let currentPort = port
+  let retriesLeft = maxRetries
+  
+  while (retriesLeft >= 0) {
+    try {
+      const websocketServer = new MCPWebSocketServer(currentPort, agent)
+      console.log(`WebSocket server started on port ${currentPort}`)
+      return { server: websocketServer, port: currentPort }
+    } catch (error: any) {
+      if (error.code === 'EADDRINUSE' && retriesLeft > 0) {
+        console.warn(`WebSocket port ${currentPort} is already in use.`)
+        currentPort++
+        console.log(`Trying WebSocket port ${currentPort}...`)
+        retriesLeft--
+      } else {
+        if (retriesLeft <= 0) {
+          throw new Error(`Failed to find an available WebSocket port after ${maxRetries} attempts.`)
+        } else {
+          throw error
+        }
+      }
+    }
+  }
+  
+  // This should never be reached due to the while loop and error throwing
+  throw new Error("Failed to start WebSocket server")
+}
+
 async function startServer() {
   try {
     // Get node path and MCP server path from environment or use defaults
@@ -189,14 +261,16 @@ Use these tools to help the user manage their Sanity content.`,
       }
     })
 
-    // Start the Express server
-    app.listen(HTTP_PORT, () => {
-      console.log(`Server running at http://localhost:${HTTP_PORT}`)
-    })
-
-    // Start the WebSocket server with the Mastra agent
-    const websocketServer = new MCPWebSocketServer(WS_PORT, agent)
-    console.log(`WebSocket server started on port ${WS_PORT}`)
+    // Start the Express server with port fallback
+    const actualHttpPort = await startExpressServer(app, HTTP_PORT)
+    
+    // Start the WebSocket server with the Mastra agent and port fallback
+    const { server: websocketServer, port: actualWsPort } = await startWebSocketServer(WS_PORT, agent)
+    
+    // Log the actual ports being used
+    console.log(`Server is running on:`);
+    console.log(`- HTTP API: http://localhost:${actualHttpPort}`);
+    console.log(`- WebSocket: ws://localhost:${actualWsPort}`);
 
     // Handle graceful shutdown
     process.on("SIGINT", async () => {
