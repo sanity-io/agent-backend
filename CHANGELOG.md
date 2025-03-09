@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-03-09
+
 ### Added
 - Repository extraction from monorepo structure
 - Initial Dockerization support
@@ -29,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced state management to include session information
 - Replaced console logging with structured logger
 - Improved WebSocket error handling and recovery
+- Removed Mastra dependencies and implementation
+- Switched to LangGraph for agent workflows
+- Implemented SanityAgentAdapter with LangGraph support
+- Enhanced logging for debugging WebSocket communication
 
 ### Fixed
 - ESM/CommonJS compatibility issues with pkce-challenge package
@@ -38,14 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Addressed client disconnection issues with session persistence
 - Enhanced error reporting for debugging
 - Fixed server startup crashes due to module loading issues
+- Fixed WebSocket message format for client communication
 
 ### Planned
-- **LangGraph Migration (v0.2.0)** - Comprehensive migration from Mastra to LangGraph:
-  - Core LangGraph workflow implementation with typed state schema
+- **LangGraph Migration (v0.2.0)** - Continue migration to LangGraph:
+  - Enhance LangGraph workflow implementation with typed state schema
   - Enhanced tool execution with parallel processing and streaming results
   - Robust state persistence with WebSocket reconnection support
   - Comprehensive tracing and debugging capabilities
-  - Incremental deprecation of Mastra components
   - Performance optimization for large document sets and complex workflows
 
 - **Authentication System (v0.3.0)**:
