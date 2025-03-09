@@ -52,6 +52,9 @@ conversational interface.
    # You need at least one of these:
    OPENAI_API_KEY=your_openai_key
    ANTHROPIC_API_KEY=your_anthropic_key
+   
+   # Optional - configure which Claude model to use:
+   ANTHROPIC_MODEL_NAME=claude-3-7-sonnet-latest
    ```
 
 ### Project Structure

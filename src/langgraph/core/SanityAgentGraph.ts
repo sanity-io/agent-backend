@@ -21,10 +21,13 @@ export async function createSanityAgentGraph(
   anthropicApiKey: string,
   mcpClient: SanityMCPClient
 ): Promise<StateGraph<SanityAgentState>> {
+  // Get the model name from environment variable or use default
+  const modelName = process.env.ANTHROPIC_MODEL_NAME || "claude-3-7-sonnet-latest";
+  
   // Create the model
   const model = new ChatAnthropic({
     apiKey: anthropicApiKey,
-    modelName: "claude-3-7-sonnet-20240229",
+    modelName,
   });
   
   // Create Sanity tools

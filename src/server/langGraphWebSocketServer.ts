@@ -131,6 +131,25 @@ export class LangGraphWebSocketServer {
       this.setupServerHandlers();
       this.setupHeartbeat();
       
+      // Schedule regular session cleanup
+      setInterval(() => this.cleanupExpiredSessions(), this.SESSION_EXPIRY);
+      
+      // Log connected clients every 10 seconds for debugging
+      setInterval(() => {
+        const connectedClients = Array.from(this.clients.entries()).map(([id, client]) => ({
+          id,
+          sessionId: client.sessionId || 'none',
+          lastActive: new Date(client.lastActive).toISOString(),
+          isAlive: client.isAlive,
+          readyState: client.ws.readyState
+        }));
+        
+        logger.info(`Connected clients: ${connectedClients.length}`, { 
+          clients: connectedClients,
+          sessions: this.sessions.size
+        });
+      }, 10000);
+      
       logger.info(`WebSocket server started on port ${port}`);
     } catch (error) {
       const normalizedError = normalizeError(error);
@@ -186,17 +205,28 @@ export class LangGraphWebSocketServer {
       logger.info("WebSocket server shutting down due to SIGINT");
     });
 
-    this.server.on("connection", (ws: WebSocket) => {
+    this.server.on("connection", (ws: WebSocket, req: any) => {
       // Generate a unique client ID
       const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-      // Store the client with active status
-      this.clients.set(clientId, { 
-        ws, 
-        id: clientId, 
+      
+      // Get client IP and origin for logging
+      const clientIP = req.socket.remoteAddress || 'unknown';
+      const origin = req.headers.origin || 'unknown';
+      
+      // Record client info
+      this.clients.set(clientId, {
+        ws,
+        id: clientId,
         lastActive: Date.now(),
         isAlive: true,
         reconnectAttempts: 0
+      });
+
+      logger.info(`New WebSocket connection: ${clientId}`, {
+        clientIP,
+        origin,
+        headers: req.headers,
+        url: req.url
       });
 
       connectionCount++;
@@ -368,13 +398,27 @@ export class LangGraphWebSocketServer {
 
       // Process the message with the LangGraph agent
       const response = await this.agent.generate(content);
+      
+      logger.info(`Generated agent response: ${response.length} characters`);
 
       // Send the agent's response back to the client
-      this.sendToClient(clientId, {
+      logger.info(`Sending agent response to client ${clientId}`);
+      
+      // Create the message payload
+      const messagePayload: WebSocketMessage = {
         type: "agent_message",
-        payload: { message: response },
+        payload: { 
+          message: response,  // The server sends the message in 'message' field
+          timestamp: new Date().toISOString() 
+        },
         requestId
-      });
+      };
+      
+      // Log the exact payload being sent
+      logger.info(`Agent message payload: ${JSON.stringify(messagePayload)}`);
+      
+      this.sendToClient(clientId, messagePayload);
+      logger.info(`Agent response sent to client ${clientId}`);
 
       // Update agent state
       this.agentState.session.lastActivity = new Date().toISOString();
@@ -533,10 +577,26 @@ export class LangGraphWebSocketServer {
    */
   private sendToClient(clientId: string, message: WebSocketMessage) {
     const client = this.clients.get(clientId);
-    if (!client) return;
+    if (!client) {
+      logger.warn(`Attempted to send message to non-existent client: ${clientId}`);
+      return;
+    }
 
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(JSON.stringify(message));
+    try {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        const messageString = JSON.stringify(message);
+        logger.debug(`Sending message to client ${clientId}: ${message.type} (${messageString.length} bytes)`);
+        client.ws.send(messageString);
+        logger.debug(`Message sent successfully to client ${clientId}`);
+      } else {
+        logger.warn(`Cannot send message to client ${clientId}: WebSocket not in OPEN state (current state: ${client.ws.readyState})`);
+      }
+    } catch (error) {
+      logger.error(`Error sending message to client ${clientId}:`, {
+        error: error instanceof Error ? error.message : String(error),
+        messageType: message.type,
+        clientState: client.ws.readyState
+      });
     }
   }
 

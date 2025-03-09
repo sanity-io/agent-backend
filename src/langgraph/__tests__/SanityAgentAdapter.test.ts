@@ -3,13 +3,13 @@
  */
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 import { SanityAgentAdapter } from '../core/SanityAgentAdapter.js';
-import { MastraMCPClient } from '@mastra/mcp';
+import { SanityMCPClient } from '../utils/MCPClient.js';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 
-// Mock MastraMCPClient
-vi.mock('@mastra/mcp', () => {
+// Mock SanityMCPClient
+vi.mock('../utils/MCPClient.js', () => {
   return {
-    MastraMCPClient: vi.fn().mockImplementation(() => {
+    SanityMCPClient: vi.fn().mockImplementation(() => {
       return {
         connect: vi.fn().mockResolvedValue(undefined),
         tools: vi.fn().mockResolvedValue({
@@ -37,16 +37,13 @@ vi.mock('@langchain/anthropic', () => {
 
 describe('SanityAgentAdapter', () => {
   let adapter: SanityAgentAdapter;
-  let mcpClient: MastraMCPClient;
+  let mcpClient: SanityMCPClient;
   
   beforeEach(async () => {
     // Create a new MCP client mock with the required server parameter
-    mcpClient = new MastraMCPClient({
-      name: 'test-mcp',
-      server: {
-        command: 'node',
-        args: ['test-server.js']
-      }
+    mcpClient = new SanityMCPClient({
+      serverPath: 'test-server.js',
+      nodePath: 'node'
     });
     
     // Create a new adapter with mocked dependencies

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Robust error handling utilities with recovery mechanisms
 - Connection recovery with exponential backoff
 - Debug startup mode for easier troubleshooting
+- Environment variable for Claude model configuration (`ANTHROPIC_MODEL_NAME`) using the latest model version
 
 ### Changed
 - Updated package.json for standalone operation

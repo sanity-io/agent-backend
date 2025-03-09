@@ -33,8 +33,8 @@ const logLevelColors: Record<LogLevel, string> = {
 const RESET_COLOR = '\x1b[0m';
 
 // Default minimum log level from environment or INFO
-const DEFAULT_LOG_LEVEL = process.env.MASTRA_LOG_LEVEL 
-  ? parseLogLevel(process.env.MASTRA_LOG_LEVEL) 
+const DEFAULT_LOG_LEVEL = process.env.MCP_LOG_LEVEL 
+  ? parseLogLevel(process.env.MCP_LOG_LEVEL) 
   : LogLevel.INFO;
 
 /**

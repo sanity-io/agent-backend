@@ -30,14 +30,14 @@ console.log('✅ Error handler loaded');
 
 // Load AI dependencies
 console.log('Loading AI dependencies...');
-import { Agent } from "@mastra/core/agent";
-import { MastraMCPClient } from "@mastra/mcp";
+import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js";
+import { SanityMCPClient } from "./langgraph/utils/MCPClient.js";
 import { anthropic } from "@ai-sdk/anthropic";
 console.log('✅ AI dependencies loaded');
 
 // Finally try loading the WebSocket server
 console.log('Loading WebSocket server...');
-import { MCPWebSocketServer } from "./server/websocketServer.js";
+import { LangGraphWebSocketServer } from "./server/langGraphWebSocketServer.js";
 console.log('✅ WebSocket server loaded');
 
 // Set up __dirname as we're in ESM

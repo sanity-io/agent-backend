@@ -29,10 +29,13 @@ export class SanityAgentAdapter {
     private anthropicApiKey: string,
     private mcpClient: SimpleMCPClient
   ) {
+    // Get the model name from environment variable or use default
+    const modelName = process.env.ANTHROPIC_MODEL_NAME || "claude-3-7-sonnet-latest";
+    
     // Initialize the model
     this.model = new ChatAnthropic({
       apiKey: anthropicApiKey,
-      modelName: "claude-3-7-sonnet-20240229",
+      modelName,
     });
     
     // Initialize system prompt

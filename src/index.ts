@@ -28,8 +28,8 @@ import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js";
 
 // Create logger
 const logger = createLogger('Server', {
-  level: process.env.MASTRA_LOG_LEVEL 
-    ? (process.env.MASTRA_LOG_LEVEL.toLowerCase() === 'debug' ? LogLevel.DEBUG : LogLevel.INFO)
+  level: process.env.MCP_LOG_LEVEL 
+    ? (process.env.MCP_LOG_LEVEL.toLowerCase() === 'debug' ? LogLevel.DEBUG : LogLevel.INFO)
     : LogLevel.INFO
 })
 
@@ -75,11 +75,13 @@ loadEnvironmentVariables()
 const HTTP_PORT = parseInt(process.env.PORT || "3005") // Use 3005 as default for HTTP
 const WS_PORT = parseInt(process.env.WEBSOCKET_PORT || "3002") // Keep WebSocket on 3002
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+const ANTHROPIC_MODEL_NAME = process.env.ANTHROPIC_MODEL_NAME || "claude-3-7-sonnet-latest"
 
 console.log("Environment variables loaded:");
 console.log("- HTTP_PORT:", HTTP_PORT);
 console.log("- WS_PORT:", WS_PORT);
 console.log("- ANTHROPIC_API_KEY:", ANTHROPIC_API_KEY ? "Set" : "Not set");
+console.log("- ANTHROPIC_MODEL_NAME:", ANTHROPIC_MODEL_NAME);
 
 if (!ANTHROPIC_API_KEY) {
   logger.error("ANTHROPIC_API_KEY environment variable is required")
@@ -256,7 +258,7 @@ async function startServer() {
       logger.info("=====================================")
       logger.info("✅ Sanity LangGraph agent initialized")
       logger.info("=====================================")
-      logger.info(`Agent model: Claude 3.7 Sonnet`)
+      logger.info(`Agent model: ${ANTHROPIC_MODEL_NAME}`)
       logger.info(`Agent tools: ${agent.getTools().length} tools available`)
       logger.info("=====================================")
       
