@@ -191,17 +191,18 @@ async function startServer() {
     
     // Get MCP server path from environment or use the default in SimpleMCPClient
     const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH;
-    console.log("MCP server path:", mcpServerPath || "Using default path");
+    if (!mcpServerPath) {
+      logger.error("MCP server path not defined in environment variables");
+      logger.error("Please ensure SANITY_MCP_SERVER_PATH is set in your .env file");
+      process.exit(1);
+    }
+    console.log("MCP server path:", mcpServerPath);
     
     logger.info("=====================================")
     logger.info("Starting Sanity MCP Agent server")
     logger.info("=====================================")
     logger.info(`Node path: ${process.execPath}`)
-    if (mcpServerPath) {
-      logger.info(`MCP server path: ${mcpServerPath}`)
-    } else {
-      logger.info("Using default MCP server path")
-    }
+    logger.info(`MCP server path: ${mcpServerPath}`)
     logger.info("=====================================")
     
     try {
@@ -209,14 +210,22 @@ async function startServer() {
       console.log("Creating SimpleMCPClient instance...");
       const simpleMCPClient = new SimpleMCPClient({
         serverPath: mcpServerPath,
+        nodePath: process.execPath,
+        timeout: 30000  // 30 second timeout
       });
       console.log("SimpleMCPClient instance created");
 
       // Connect to the MCP server
       logger.info("Connecting to Sanity MCP server...")
       console.log("Connecting to MCP server...");
-      await simpleMCPClient.connect();
-      console.log("Connected to MCP server successfully");
+      
+      try {
+        await simpleMCPClient.connect();
+        console.log("Connected to MCP server successfully");
+      } catch (error) {
+        logger.error(`Failed to connect to MCP server: ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn("Will continue with mock tools for development purposes");
+      }
       
       // Enhanced logging after connection
       logger.info("=====================================")
