@@ -4,44 +4,53 @@
  * These tests check the integration between components rather than individual units
  */
 
-import { MCPWebSocketServer } from '../server/websocketServer';
+import { expect, describe, it, beforeAll, afterAll, vi } from 'vitest';
+import { LangGraphWebSocketServer } from '../server/langGraphWebSocketServer.js';
 
 // Mock the Agent
 const mockAgent = {
-  generate: jest.fn().mockResolvedValue({ text: 'Mock agent response' }),
-  executeTool: jest.fn().mockResolvedValue({ success: true, result: 'Mock tool result' }),
+  generate: vi.fn().mockResolvedValue('Mock agent response'),
+  getTools: vi.fn().mockReturnValue([]),
+  getState: vi.fn().mockReturnValue({
+    messages: [],
+    sessionInfo: { 
+      id: 'test-session',
+      startedAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString()
+    }
+  }),
+  initialize: vi.fn().mockResolvedValue(undefined)
 };
 
 // Mock WebSocket Connection
-jest.mock('ws', () => {
+vi.mock('ws', () => {
   return {
-    __esModule: true,
-    WebSocket: jest.fn(),
-    WebSocketServer: jest.fn(() => ({
-      on: jest.fn(),
-      close: jest.fn(),
+    WebSocket: vi.fn(),
+    WebSocketServer: vi.fn(() => ({
+      on: vi.fn(),
+      close: vi.fn(),
     })),
   };
 });
 
 describe('MCP Agent Integration', () => {
-  let server: MCPWebSocketServer;
+  let server: LangGraphWebSocketServer;
   
   beforeAll(() => {
     // Create server instance for tests
-    server = new MCPWebSocketServer(3002, mockAgent as any);
+    server = new LangGraphWebSocketServer(3002, mockAgent as any);
   });
   
   afterAll(() => {
     // Clean up resources
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
   
-  test('should properly initialize the WebSocket server', () => {
+  it('should properly initialize the WebSocket server', () => {
     expect(server).toBeDefined();
   });
   
-  test('should handle document focus events', () => {
+  it('should handle document focus events', () => {
     // This test is a placeholder for an actual integration test
     // In a real test, we would:
     // 1. Simulate a document focus event
@@ -50,7 +59,7 @@ describe('MCP Agent Integration', () => {
     expect(true).toBeTruthy();
   });
   
-  test('should handle user messages', async () => {
+  it('should handle user messages', async () => {
     // This test is a placeholder for an actual integration test
     // In a real test, we would:
     // 1. Send a mock user message

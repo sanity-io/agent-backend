@@ -1,7 +1,21 @@
 # TODO
 
 ## High Priority
-0. [✅] **Write a comprehensive suite of unit tests - make a plan here**
+1. [ ] **Fix LangGraph's access to Sanity tools**  (High Priority)
+
+    - Issue: MCP server is registered but LangGraph can't run tools
+    - Tools are accessible via the MCP server but not being properly executed
+    - Need to ensure proper tool registration and execution flow in LangGraph adapter
+    - Fix type issues between LangGraph and MCP tools format
+
+    ### Implementation plan
+    1. [ ] Debug tool execution flow from LangGraph to MCP
+    2. [ ] Fix type conversions between LangGraph tool format and MCP
+    3. [ ] Add robust error handling for tool execution
+    4. [ ] Add tests for tool execution flow
+    5. [ ] Document the tool registration and execution process
+
+2. [✅] **Write a comprehensive suite of unit tests - make a plan here**
 
     ### Comprehensive Testing Plan
     - [✅] Set up Vitest instead of Jest for better ESM compatibility
@@ -47,7 +61,7 @@
       - [ ] Implement coverage enforcement
     - [ ] Monitor and maintain test coverage above 85%
 
-1. [✅] **Fix ESM/CommonJS compatibility issues**
+3. [✅] **Fix ESM/CommonJS compatibility issues**
 
     - Resolve the pkce-challenge package ESM compatibility error
     - Update package.json with proper resolutions for ESM modules
@@ -64,7 +78,7 @@
          - Add experimental-specifier-resolution for Node.js
          - Improve environment loading function
 
-2. [✅] **Improve WebSocket connection stability**
+4. [✅] **Improve WebSocket connection stability**
 
     - Enhance reconnection logic
     - Add better error handling and logging
@@ -82,7 +96,7 @@
          - Add structured logging for connection events
          - Implement graceful recovery from connection errors
 
-3. [ ] **Switch from Mastra to LangGraph**  (In progress)
+5. [ ] **Switch from Mastra to LangGraph**  (In progress)
 
     - Migrate from Mastra agent framework to LangGraph for more robust agent workflows
     - Gain benefits from LangGraph's state management, tracing, and debugging capabilities
@@ -219,7 +233,7 @@
          - Implement distributed tracing for production
          - Create resource utilization monitoring
 
-4. [ ] **Add comprehensive authentication system**
+6. [ ] **Add comprehensive authentication system**
 
     - Implement token-based authentication for WebSocket connections
     - Add environment variable configuration for auth settings

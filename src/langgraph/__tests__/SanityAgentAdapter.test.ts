@@ -3,20 +3,49 @@
  */
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 import { SanityAgentAdapter } from '../core/SanityAgentAdapter.js';
-import { SanityMCPClient } from '../utils/MCPClient.js';
+import { SimpleMCPClient } from '../../mcp/SimpleMCPClient.js';
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 
-// Mock SanityMCPClient
-vi.mock('../utils/MCPClient.js', () => {
+// Mock SimpleMCPClient
+vi.mock('../../mcp/SimpleMCPClient.js', () => {
   return {
-    SanityMCPClient: vi.fn().mockImplementation(() => {
+    SimpleMCPClient: vi.fn().mockImplementation(() => {
       return {
         connect: vi.fn().mockResolvedValue(undefined),
-        tools: vi.fn().mockResolvedValue({
-          getDocument: vi.fn().mockResolvedValue({ _id: 'doc123', title: 'Test Document' }),
-          listDocuments: vi.fn().mockResolvedValue([{ _id: 'doc123', title: 'Test Document' }]),
-          createDocument: vi.fn().mockResolvedValue({ _id: 'doc456', title: 'New Document' }),
-        }),
+        getTools: vi.fn().mockReturnValue([
+          {
+            name: 'getDocument',
+            description: 'Get a document',
+            schema: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' }
+              },
+              required: ['id']
+            },
+            func: vi.fn().mockResolvedValue({ _id: 'doc123', title: 'Test Document' })
+          },
+          {
+            name: 'listDocuments',
+            description: 'List documents',
+            schema: { type: 'object', properties: {} },
+            func: vi.fn().mockResolvedValue([{ _id: 'doc123', title: 'Test Document' }])
+          },
+          {
+            name: 'createDocument',
+            description: 'Create a document',
+            schema: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                data: { type: 'object' }
+              },
+              required: ['type', 'data']
+            },
+            func: vi.fn().mockResolvedValue({ _id: 'doc456', title: 'New Document' })
+          }
+        ]),
+        disconnect: vi.fn().mockResolvedValue(undefined)
       };
     }),
   };
@@ -37,11 +66,11 @@ vi.mock('@langchain/anthropic', () => {
 
 describe('SanityAgentAdapter', () => {
   let adapter: SanityAgentAdapter;
-  let mcpClient: SanityMCPClient;
+  let mcpClient: SimpleMCPClient;
   
   beforeEach(async () => {
     // Create a new MCP client mock with the required server parameter
-    mcpClient = new SanityMCPClient({
+    mcpClient = new SimpleMCPClient({
       serverPath: 'test-server.js',
       nodePath: 'node'
     });

@@ -22,9 +22,9 @@ export class SanityMCPClient {
   private process: ChildProcess | null = null;
   private toolCache: Record<string, Function> = {};
   private ready = false;
-  private messageQueue: { resolve: Function; reject: Function; message: any }[] = [];
+  private messageQueue: { resolve: (value: any) => void; reject: (reason: any) => void; message: any }[] = [];
   private messageId = 0;
-  private pendingRequests: Map<number, { resolve: Function; reject: Function }> = new Map();
+  private pendingRequests: Map<number, { resolve: (value: any) => void; reject: (reason: any) => void }> = new Map();
   
   /**
    * Create a new MCP Client
