@@ -7,6 +7,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "node src/startServer.js",
+    "dev:mastra": "node src/startMastra.js",
     "dev:ts": "node --loader ts-node/esm src/index.ts",
     "build": "tsc --project config/tsconfig.json",
     "start": "node dist/index.js",
@@ -25,6 +26,7 @@
     "@langchain/anthropic": "^0.1.0",
     "@langchain/core": "^0.2.0",
     "@langchain/langgraph": "^0.1.0",
+    "@mastra/mcp": "^0.2.6",
     "@modelcontextprotocol/sdk": "^1.6.1",
     "@sanity/client": "^6.28.3",
     "cors": "^2.8.5",

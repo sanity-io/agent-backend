@@ -96,15 +96,22 @@
          - Add structured logging for connection events
          - Implement graceful recovery from connection errors
 
-5. [ ] **Switch from Mastra to LangGraph**  (In progress)
+5. [ ] **LangGraph and Mastra Integration**  (In progress)
 
-    - Migrate from Mastra agent framework to LangGraph for more robust agent workflows
-    - Gain benefits from LangGraph's state management, tracing, and debugging capabilities
-    - Improve modularity and maintainability of agent logic
-    - Support more complex conversation patterns with branching and parallel execution
+    - Provide both LangGraph and Mastra implementations for flexibility
+    - Support LangGraph for newer workflows with enhanced features
+    - Maintain Mastra implementation for compatibility and simpler use cases
+    - Allow switching between implementations based on use case requirements
 
     ### Implementation plan
-    1. [ ] **Research and setup LangGraph integration**
+    1. [✅] **Restore Mastra implementation**
+         - Restore core Mastra files from earlier commits
+         - Set up Mastra integration with MCP server
+         - Create startup script for Mastra-based server
+         - Verify connection to MCP server and tool access
+         - Add proper logging for tool discovery and server startup
+         
+    2. [ ] **Research and setup LangGraph integration**
          - Add LangGraph dependencies to package.json: 
            ```json
            {
@@ -121,7 +128,7 @@
          - Evaluate performance and scaling considerations
          - Set up local debugging tools for LangGraph traces
     
-    2. [ ] **Create core LangGraph component structure**
+    3. [ ] **Create core LangGraph component structure**
          - Design state schema to replace Mastra agent state
            ```typescript
            interface SanityAgentState {
@@ -146,7 +153,7 @@
          - Implement typed input/output validation between nodes
          - Set up explicit state transitions with validation
     
-    3. [ ] **Implement tool integration architecture**
+    4. [ ] **Implement tool integration architecture**
          - Create wrapper for existing Sanity MCP tools to work with LangGraph
            ```typescript
            class SanityToolWrapper implements ToolInterface {
@@ -165,7 +172,7 @@
          - Implement rate limiting and batching for tool calls
          - Create tool discovery mechanism for dynamic loading
     
-    4. [ ] **Develop state persistence and recovery mechanism**
+    5. [ ] **Develop state persistence and recovery mechanism**
          - Design state persistence adapters for WebSocket reconnection
            ```typescript
            interface StateStorageAdapter {
@@ -183,7 +190,7 @@
          - Add state snapshots for historical reference
          - Implement state compression for efficiency
     
-    5. [ ] **Create comprehensive tracing and debugging**
+    6. [ ] **Create comprehensive tracing and debugging**
          - Implement LangGraph trace collection for each conversation
          - Add visualization endpoints for workflow inspection
          - Create structured logging throughout the graph
@@ -194,7 +201,7 @@
          - Add monitoring dashboard for runtime insights
          - Create replay functionality for debugging past conversations
     
-    6. [ ] **Build enhanced conversation capabilities**
+    7. [ ] **Build enhanced conversation capabilities**
          - Add support for multi-turn reasoning chains
          - Implement conversation memory management
          - Create document-grounded conversations
@@ -204,7 +211,7 @@
          - Add conversation branching for exploration
          - Implement conversation metadata annotations
     
-    7. [ ] **Deprecate Mastra components incrementally**
+    8. [ ] **Deprecate Mastra components incrementally**
          - Identify all Mastra usage in codebase
          - Create adapter layer to minimize migration impact
            ```typescript
@@ -223,7 +230,7 @@
          - Implement A/B testing between implementations
          - Set up phased deprecation with metrics collection
     
-    8. [ ] **Performance optimization and scaling**
+    9. [ ] **Performance optimization and scaling**
          - Implement lazy loading of LangGraph components
          - Add caching for common operations
          - Optimize state serialization for WebSocket transport

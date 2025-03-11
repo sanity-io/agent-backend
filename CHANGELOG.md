@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1] - 2025-03-09
-
 ### Added
 - Repository extraction from monorepo structure
 - Initial Dockerization support
@@ -22,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection recovery with exponential backoff
 - Debug startup mode for easier troubleshooting
 - Environment variable for Claude model configuration (`ANTHROPIC_MODEL_NAME`) using the latest model version
+- Restored Mastra implementation from previous commit
+- Added alternative startup script for Mastra-based server
+- Created unified startup mechanism for both LangGraph and Mastra implementations
+- Enhanced tool logging for better debugging and visibility
+- Added support for Mastra.ai MCP client for simpler integration
 
 ### Changed
 - Updated package.json for standalone operation
@@ -35,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Switched to LangGraph for agent workflows
 - Implemented SanityAgentAdapter with LangGraph support
 - Enhanced logging for debugging WebSocket communication
+- Modified server structure to support both implementations
+- Updated environment variable handling for compatibility with both approaches
+- Enhanced WebSocket server interface to work with both agent types
 
 ### Fixed
 - ESM/CommonJS compatibility issues with pkce-challenge package
