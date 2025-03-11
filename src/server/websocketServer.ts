@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from "ws"
-import { Agent } from "@mastra/core/agent"
+import { Agent } from "../mastra/core.js"
 import { createLogger } from "../utils/logger.js"
 import { tryCatch, normalizeError, ConnectionError, isRecoverableConnectionError } from "../utils/errorHandler.js"
 
@@ -342,7 +342,7 @@ export class MCPWebSocketServer {
       const response = await this.agent.generate(content)
 
       // Extract the response text and format appropriately
-      const responseText = response.text || response.toString()
+      const responseText = response.content || response.toString()
 
       // Send the agent's response back to the client
       this.sendToClient(clientId, {

@@ -467,4 +467,30 @@ export class SimpleMCPClient {
     
     logger.info("Disconnected from MCP server");
   }
+
+  /**
+   * Execute a tool with the given parameters
+   * @param name Tool name
+   * @param params Tool parameters
+   * @returns Tool execution result
+   */
+  async executeTool(name: string, params: any): Promise<any> {
+    // Find the tool by name
+    const tool = this.tools.find(t => t.name === name);
+    
+    if (!tool) {
+      throw new Error(`Tool ${name} not found`);
+    }
+    
+    try {
+      // Log the tool execution
+      logger.debug(`Executing tool ${name} with params: ${JSON.stringify(params)}`);
+      
+      // Execute the tool
+      return await tool.func(params);
+    } catch (error) {
+      logger.error(`Error executing tool ${name}: ${error}`);
+      throw error;
+    }
+  }
 } 

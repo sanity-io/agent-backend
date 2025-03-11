@@ -25,6 +25,11 @@ console.log("Current working directory:", process.cwd());
 // Use the SimpleMCPClient for a proper ESM implementation
 import { SimpleMCPClient } from "./mcp/SimpleMCPClient.js";
 import { SanityAgentAdapter } from "./langgraph/core/SanityAgentAdapter.js";
+import { createSanityAgent } from "./mastra/agents/sanityAgent.js";
+import { SanityMCPClient } from "./mcp/SanityMCPClient.js";
+
+// Add the import for our simplified agent
+import { createSimpleSanityAgent } from "./mastra/agents/simpleSanityAgent.js";
 
 // Create logger
 const logger = createLogger('Server', {
@@ -167,14 +172,14 @@ const startExpressServer = (app: express.Application, port: number, maxRetries =
 /**
  * Start a WebSocket server on a specific port
  * @param {number} port - The port to use (no fallback)
- * @param {SanityAgentAdapter} agent - The agent to use
+ * @param {Agent} agent - The agent to use
  * @returns {Promise<{server: any, port: number}>}
  */
 const startWebSocketServer = async (port: number, agent: any): Promise<{server: any, port: number}> => {
   try {
     // Dynamic import to avoid issues
-    const { LangGraphWebSocketServer } = await import("./server/langGraphWebSocketServer.js");
-    const websocketServer = new LangGraphWebSocketServer(port, agent);
+    const { MCPWebSocketServer } = await import("./server/websocketServer.js");
+    const websocketServer = new MCPWebSocketServer(port, agent);
     logger.info(`WebSocket server started on port ${port}`);
     return { server: websocketServer, port };
   } catch (error: any) {
@@ -191,13 +196,20 @@ async function startServer() {
     console.log("=== Starting Sanity MCP Agent server ===");
     logger.info('Starting Sanity MCP Agent server...')
     
-    // Get MCP server path from environment or use the default in SimpleMCPClient
+    // Initialize MCP client
     const mcpServerPath = process.env.SANITY_MCP_SERVER_PATH;
     if (!mcpServerPath) {
       logger.error("MCP server path not defined in environment variables");
       logger.error("Please ensure SANITY_MCP_SERVER_PATH is set in your .env file");
       process.exit(1);
     }
+
+    // Create a client for the MCP server
+    const mcpClient = new SanityMCPClient({
+      serverPath: mcpServerPath,
+      timeout: 10000,
+    });
+
     console.log("MCP server path:", mcpServerPath);
     
     logger.info("=====================================")
@@ -208,21 +220,18 @@ async function startServer() {
     logger.info("=====================================")
     
     try {
-      // Initialize the MCP client using our simple implementation
-      console.log("Creating SimpleMCPClient instance...");
-      const simpleMCPClient = new SimpleMCPClient({
+      // Create a client for the MCP server
+      const mcpClient = new SanityMCPClient({
         serverPath: mcpServerPath,
-        nodePath: process.execPath,
-        timeout: 30000  // 30 second timeout
+        timeout: 10000,
       });
-      console.log("SimpleMCPClient instance created");
 
       // Connect to the MCP server
       logger.info("Connecting to Sanity MCP server...")
       console.log("Connecting to MCP server...");
       
       try {
-        await simpleMCPClient.connect();
+        await mcpClient.connect();
         console.log("Connected to MCP server successfully");
       } catch (error) {
         logger.error(`Failed to connect to MCP server: ${error instanceof Error ? error.message : String(error)}`);
@@ -235,31 +244,25 @@ async function startServer() {
       logger.info("=====================================")
       
       console.log("Getting tools...");
-      const tools = simpleMCPClient.getTools();
-      console.log(`Got ${tools.length} tools from MCP server`);
+      const toolFunctions = await mcpClient.tools();
+      console.log(`Got ${Object.keys(toolFunctions).length} tools from MCP server`);
       
-      logger.debug(`Available tools: ${tools.length}`);
-      tools.forEach((tool) => {
-        logger.debug(`  - ${tool.name}: ${tool.description || 'No description'}`);
+      logger.debug(`Available tools: ${Object.keys(toolFunctions).length}`);
+      Object.keys(toolFunctions).forEach((toolName) => {
+        logger.debug(`  - ${toolName}`);
       });
       logger.info("=====================================")
       
-      // Create a LangGraph agent adapter
-      console.log("Creating SanityAgentAdapter instance...");
-      const agent = new SanityAgentAdapter(ANTHROPIC_API_KEY!, simpleMCPClient);
-      console.log("SanityAgentAdapter instance created");
-      
-      // Initialize the agent
-      console.log("Initializing agent...");
-      await agent.initialize();
-      console.log("Agent initialized successfully");
+      // Create a Mastra agent
+      console.log("Creating Sanity Mastra Agent...");
+      const agent = await createSimpleSanityAgent();
+      console.log("Sanity Mastra Agent created");
       
       // Log agent initialization
       logger.info("=====================================")
-      logger.info("✅ Sanity LangGraph agent initialized")
+      logger.info("✅ Sanity Mastra agent initialized")
       logger.info("=====================================")
       logger.info(`Agent model: ${ANTHROPIC_MODEL_NAME}`)
-      logger.info(`Agent tools: ${agent.getTools().length} tools available`)
       logger.info("=====================================")
       
       // Start the WebSocket server on the fixed WS_PORT with no fallback
@@ -327,15 +330,15 @@ async function startServer() {
         process.on("SIGINT", async () => {
           logger.info("Shutting down gracefully...");
           
-          // Disconnect MCP client
-          try {
-            await simpleMCPClient.disconnect();
-            logger.info("MCP client disconnected");
-          } catch (err) {
-            logger.error("Error disconnecting MCP client:", {
-              error: err instanceof Error ? err.message : String(err)
-            });
-          }
+          // Disconnect MCP client - not needed with simplified agent
+          // try {
+          //   await mcpClient.disconnect();
+          //   logger.info("MCP client disconnected");
+          // } catch (err) {
+          //   logger.error("Error disconnecting MCP client:", {
+          //     error: err instanceof Error ? err.message : String(err),
+          //   });
+          // }
           
           process.exit(0);
         });

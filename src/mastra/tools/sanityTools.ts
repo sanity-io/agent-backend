@@ -1,10 +1,35 @@
-import { createTool } from "@mastra/core/tools"
+// Import the Tool class from our local implementation
+import { Tool } from "../../mastra/core.js"
 import { createClient } from "@sanity/client"
 import { z } from "zod"
-import type { DocumentReference } from "../agents/sanityAgent"
+import type { DocumentReference } from "../agents/sanityAgent.js"
+
+// Type annotation for the document references
+type DocRef = { id: string; type?: string; title?: string; [key: string]: any };
+
+// Create a simple helper function to replace createTool
+const createTool = ({ id, description, inputSchema, execute }: {
+  id: string;
+  description: string;
+  inputSchema: z.ZodObject<any>;
+  execute: ({ context, agent }: { context: any; agent?: any }) => Promise<any>;
+}) => {
+  return new Tool({
+    name: id,
+    description,
+    parameters: {
+      type: 'object',
+      properties: inputSchema ? inputSchema.shape : {},
+      required: inputSchema ? Object.keys(inputSchema.shape).filter(key => !inputSchema.shape[key].isOptional()) : []
+    },
+    handler: async (params) => {
+      return await execute({ context: params, agent: null });
+    }
+  });
+};
 
 // Define Sanity tools using createTool pattern
-export async function loadSanityTools(): Promise<Record<string, any>> {
+export async function loadSanityTools(): Promise<Tool[]> {
   // Initialize Sanity client
   const client = createClient({
     projectId: process.env.SANITY_PROJECT_ID,
@@ -16,8 +41,8 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
 
   console.log('Sanity client initialized with project ID:', process.env.SANITY_PROJECT_ID);
 
-  const tools = {
-    listDocuments: createTool({
+  const tools = [
+    createTool({
       id: "listDocuments",
       description: "List documents matching a GROQ query",
       inputSchema: z.object({
@@ -42,7 +67,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    getDocument: createTool({
+    createTool({
       id: "getDocument",
       description: "Get a single document by ID",
       inputSchema: z.object({
@@ -68,7 +93,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    createDocument: createTool({
+    createTool({
       id: "createDocument",
       description: "Create a new document",
       inputSchema: z.object({
@@ -117,7 +142,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    updateDocument: createTool({
+    createTool({
       id: "updateDocument",
       description: "Update an existing document",
       inputSchema: z.object({
@@ -165,7 +190,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    deleteDocument: createTool({
+    createTool({
       id: "deleteDocument",
       description: "Delete a document (requires explicit confirmation)",
       inputSchema: z.object({
@@ -222,7 +247,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    createRelease: createTool({
+    createTool({
       id: "createRelease",
       description: "Create a content release for batching changes",
       inputSchema: z.object({
@@ -256,7 +281,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    setSandboxMode: createTool({
+    createTool({
       id: "setSandboxMode",
       description: "Toggle sandbox mode to test changes safely",
       inputSchema: z.object({
@@ -273,7 +298,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
     }),
 
     // New tools for document selection management
-    addDocumentsToSelection: createTool({
+    createTool({
       id: "addDocumentsToSelection",
       description: "Add documents to the current selection based on a GROQ query",
       inputSchema: z.object({
@@ -318,7 +343,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
           }
 
           // Create references for documents to add (avoiding duplicates)
-          const existingIds = new Set(state.currentSelection.map(doc => doc.id))
+          const existingIds = new Set(state.currentSelection.map((doc: DocRef) => doc.id))
           const now = new Date().toISOString()
           
           const newDocuments: DocumentReference[] = documents
@@ -351,7 +376,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    removeDocumentsFromSelection: createTool({
+    createTool({
       id: "removeDocumentsFromSelection",
       description: "Remove documents from the current selection based on criteria",
       inputSchema: z.object({
@@ -390,7 +415,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
             // Remove specific document IDs
             const idsToRemove = new Set(ids)
             state.currentSelection = state.currentSelection.filter(
-              doc => !idsToRemove.has(doc.id)
+              (doc: DocRef) => !idsToRemove.has(doc.id)
             )
           } else if (condition) {
             // More complex: get all current IDs, then check which ones match condition
@@ -402,11 +427,11 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
                 const [_, operator, typeName] = typeMatch
                 if (operator === "==") {
                   state.currentSelection = state.currentSelection.filter(
-                    doc => doc.type === typeName
+                    (doc: DocRef) => doc.type === typeName
                   )
                 } else if (operator === "!=") {
                   state.currentSelection = state.currentSelection.filter(
-                    doc => doc.type !== typeName
+                    (doc: DocRef) => doc.type !== typeName
                   )
                 }
               }
@@ -417,7 +442,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
                 const [_, operator, text] = titleMatch
                 if (operator === "contains") {
                   state.currentSelection = state.currentSelection.filter(
-                    doc => doc.title?.toLowerCase().includes(text.toLowerCase())
+                    (doc: DocRef) => doc.title?.toLowerCase().includes(text.toLowerCase())
                   )
                 }
               }
@@ -453,7 +478,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    clearDocumentSelection: createTool({
+    createTool({
       id: "clearDocumentSelection",
       description: "Clear the entire document selection",
       inputSchema: z.object({}),
@@ -490,7 +515,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
       },
     }),
 
-    searchAndSelectDocuments: createTool({
+    createTool({
       id: "searchAndSelectDocuments",
       description: "Search for documents based on criteria and update selection",
       inputSchema: z.object({
@@ -579,7 +604,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
             state.currentSelection = docRefs;
           } else {
             // Add to selection (avoiding duplicates)
-            const existingIds = new Set(state.currentSelection.map(doc => doc.id));
+            const existingIds = new Set(state.currentSelection.map((doc: DocRef) => doc.id));
             const newDocs = docRefs.filter(doc => !existingIds.has(doc.id));
             state.currentSelection = [...state.currentSelection, ...newDocs];
           }
@@ -602,7 +627,7 @@ export async function loadSanityTools(): Promise<Record<string, any>> {
         }
       },
     })
-  }
+  ]
 
   return tools
 }

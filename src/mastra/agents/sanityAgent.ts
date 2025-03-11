@@ -1,8 +1,9 @@
-import { Agent } from "@mastra/core/agent"
-import { MastraMemory } from "@mastra/core/memory"
+import { Agent, Memory as MastraMemory } from "../../mastra/core.js"
 import { openai } from "@ai-sdk/openai"
 import { anthropic } from "@ai-sdk/anthropic"
-import { loadSanityTools } from "../tools/sanityTools"
+import { loadSanityTools } from "../tools/sanityTools.js"
+import { SanityMCPClient } from "../../mcp/SanityMCPClient.js"
+import { Tool } from "../../mastra/core.js"
 
 // Define document reference interface (metadata only, no content)
 export interface DocumentReference {
@@ -64,8 +65,37 @@ const DEFAULT_STATE: SanityAgentState = {
 }
 
 // Create the agent configuration
-export async function createSanityAgent(): Promise<Agent> {
-  const tools = await loadSanityTools()
+export async function createSanityAgent(mcpClient?: SanityMCPClient): Promise<Agent> {
+  let tools = await loadSanityTools()
+  
+  // If an MCP client is provided, add its tools
+  if (mcpClient) {
+    try {
+      // Get MCP tools directly as functions
+      const mcpToolFunctions = await mcpClient.tools();
+      console.log(`Adding ${Object.keys(mcpToolFunctions).length} tools from MCP client`);
+      
+      // Convert each MCP tool function to a Mastra Tool
+      for (const [toolName, toolFunc] of Object.entries(mcpToolFunctions)) {
+        const tool = new Tool({
+          name: toolName,
+          description: `MCP tool: ${toolName}`,
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: []
+          },
+          handler: async (params) => {
+            return await toolFunc(params);
+          }
+        });
+        
+        tools.push(tool);
+      }
+    } catch (error) {
+      console.error("Error adding MCP tools:", error);
+    }
+  }
 
   // Create a memory instance with strict limits
   const memory = new MastraMemory({
@@ -81,7 +111,7 @@ export async function createSanityAgent(): Promise<Agent> {
   const agent = new Agent({
     name: "SanityContentAssistant",
     memory,
-    instructions: `You are a helpful Content Management Assistant for Sanity.io.
+    systemMessage: `You are a helpful Content Management Assistant for Sanity.io.
 Your goal is to help content editors manage their content efficiently and accurately.
 
 CORE PRINCIPLES:
