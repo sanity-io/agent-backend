@@ -20,11 +20,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection recovery with exponential backoff
 - Debug startup mode for easier troubleshooting
 - Environment variable for Claude model configuration (`ANTHROPIC_MODEL_NAME`) using the latest model version
-- Restored Mastra implementation from previous commit
-- Added alternative startup script for Mastra-based server
+- Restored Mastra implementation from previous commit (alongside LangGraph)
+  - Restored core Mastra files (`src/mastra/core.ts`, `src/mastra/agents/sanityAgent.ts`)
+  - Restored Mastra tools implementation (`src/mastra/tools/sanityTools.ts`)
+  - Created new Mastra-specific entry point in `src/mastraIndex.ts`
+  - Successfully integrates with all MCP tools (26 total tools verified)
+- Added alternative startup script for Mastra-based server (`src/startMastra.js`)
 - Created unified startup mechanism for both LangGraph and Mastra implementations
+  - `npm run dev` for LangGraph implementation
+  - `npm run dev:mastra` for Mastra implementation
 - Enhanced tool logging for better debugging and visibility
+  - Shows detailed list of all available tools 
+  - Provides count and categorization of tools
 - Added support for Mastra.ai MCP client for simpler integration
+  - Used reference implementation from Mastra.ai documentation
+  - Direct connection to MCP server without additional abstractions
 
 ### Changed
 - Updated package.json for standalone operation
